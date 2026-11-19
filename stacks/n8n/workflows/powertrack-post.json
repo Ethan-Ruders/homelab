@@ -1,0 +1,260 @@
+{
+  "name": "PowerTrack - Reception Seance (POST)",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "powertrack",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "pt-post-webhook",
+      "name": "Webhook PowerTrack POST",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "powertrack-post-v2",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ptHeaderAuth0001",
+          "name": "PowerTrack API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const item = $input.first();\nlet rawBody = item?.json?.body ?? item?.json;\nif (typeof rawBody === 'string') {\n  try {\n    rawBody = JSON.parse(rawBody);\n  } catch (err) {\n    return [{ json: { action: 'invalid', error: 'Corps JSON invalide' } }];\n  }\n}\nif (!rawBody || typeof rawBody !== 'object') {\n  return [{ json: { action: 'invalid', error: 'Objet JSON attendu' } }];\n}\nif (rawBody.type === 'powertrack_ping') {\n  return [{ json: { action: 'ping', timestamp: rawBody.timestamp || new Date().toISOString() } }];\n}\nif (rawBody.schemaVersion !== 2 || typeof rawBody.seanceId !== 'string' || !rawBody.seanceId.trim() || !Array.isArray(rawBody.exercices)) {\n  return [{ json: { action: 'invalid', error: 'Champs requis v2 manquants (schemaVersion=2, seanceId, exercices)' } }];\n}\nreturn [{ json: { action: 'upsert', payload: rawBody } }];"
+      },
+      "id": "pt-post-validate",
+      "name": "Validate & Classify",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "cond-ping",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "ping",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "pt-post-if-ping",
+      "name": "Est un Ping ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'pong', service: 'powertrack-n8n', timestamp: $json.timestamp }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "pt-post-respond-pong",
+      "name": "Respond Pong",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        740,
+        -140
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "cond-upsert",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "upsert",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "pt-post-if-valid",
+      "name": "Payload Valide ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        740,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT powertrack_upsert_seance($1::jsonb) AS result;",
+        "options": {
+          "queryReplacement": "={{ [JSON.stringify($json.payload)] }}"
+        }
+      },
+      "id": "pt-post-pg-upsert",
+      "name": "Postgres Upsert Seance",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1000,
+        40
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "ptPostgresCred01",
+          "name": "Postgres PowerTrack"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.result) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "pt-post-respond-saved",
+      "name": "Respond Saved",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1240,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'error', message: $json.error }) }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "pt-post-respond-400",
+      "name": "Respond 400",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1000,
+        240
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook PowerTrack POST": {
+      "main": [
+        [
+          {
+            "node": "Validate & Classify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate & Classify": {
+      "main": [
+        [
+          {
+            "node": "Est un Ping ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Est un Ping ?": {
+      "main": [
+        [
+          {
+            "node": "Respond Pong",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Payload Valide ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Payload Valide ?": {
+      "main": [
+        [
+          {
+            "node": "Postgres Upsert Seance",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond 400",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres Upsert Seance": {
+      "main": [
+        [
+          {
+            "node": "Respond Saved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

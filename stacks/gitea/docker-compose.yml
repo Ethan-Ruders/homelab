@@ -1,0 +1,23 @@
+volumes:
+  gitea_data:
+
+services:
+  server:
+    image: gitea/gitea:latest
+    container_name: gitea
+    environment:
+      - USER_UID=1000
+      - USER_GID=1000
+    restart: unless-stopped
+    volumes:
+      - gitea_data:/data
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "222:22"
+    networks:
+      - homelab-net
+
+networks:
+  homelab-net:
+    external: true

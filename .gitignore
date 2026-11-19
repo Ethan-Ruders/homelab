@@ -1,0 +1,39 @@
+# Secrets et variables d'environnement
+.env
+.env.*
+!.env.example
+
+# Certificats, cles privees et PKI sensible
+*.key
+*.pem
+*.crt
+*.csr
+*.srl
+*.p12
+*.pfx
+
+# Bases de donnees et journaux SQLite
+*.sqlite
+*.sqlite3
+*.db
+*.db-wal
+*.db-shm
+
+# Dumps, archives et sauvegardes
+*.dump
+*.tar.gz
+*.tgz
+*.zst
+*.bak
+
+# Etat runtime des services
+postgres-data/
+npm/
+adguard/
+AdGuardHome.yaml
+n8n/config
+
+# Systeme et journaux
+.DS_Store
+*.log
+*.tmp

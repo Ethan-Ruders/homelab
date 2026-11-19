@@ -1,0 +1,33 @@
+services:
+  # --- REVERSE PROXY ---
+  nginx-proxy-manager:
+    image: 'jc21/nginx-proxy-manager:latest'
+    container_name: nginx-proxy-manager
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '127.0.0.1:81:81'
+      - '443:443'
+    volumes:
+      - ./npm/data:/data
+      - ./npm/letsencrypt:/etc/letsencrypt
+    networks:
+      - homelab-net
+
+  # --- DNS LOCAL & BLOQUEUR DE PUB ---
+  adguard-home:
+    image: adguard/adguardhome
+    container_name: adguard-home
+    restart: unless-stopped
+    ports:
+      - '53:53/tcp'
+      - '53:53/udp'
+    volumes:
+      - ./adguard/workdir:/opt/adguardhome/work
+      - ./adguard/confdir:/opt/adguardhome/conf
+    networks:
+      - homelab-net
+
+networks:
+  homelab-net:
+    name: homelab-net

@@ -1,0 +1,18 @@
+volumes:
+  anisette_data:
+
+services:
+  anisette:
+    image: dadoum/anisette-v3-server:latest
+    container_name: anisette
+    restart: unless-stopped
+    ports:
+      - '6969:6969'
+    volumes:
+      - anisette_data:/home/Alcoholic/.config/anisette-v3/lib/
+    networks:
+      - homelab-net
+
+networks:
+  homelab-net:
+    external: true

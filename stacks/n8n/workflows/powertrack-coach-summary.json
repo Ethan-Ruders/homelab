@@ -1,0 +1,124 @@
+{
+  "name": "PowerTrack - Coach Summary (GET)",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "powertrack/coach-summary",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "pt-get-webhook",
+      "name": "Webhook Coach Summary GET",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "powertrack-coach-summary-get",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ptHeaderAuth0001",
+          "name": "PowerTrack API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const q = $input.first()?.json?.query ?? {};\nlet limit = Number.parseInt(q.limit, 10);\nif (!Number.isFinite(limit) || limit < 1) limit = 12;\nif (limit > 100) limit = 100;\nlet weeks = q.weeks !== undefined && q.weeks !== '' ? Number.parseInt(q.weeks, 10) : null;\nif (weeks !== null && (!Number.isFinite(weeks) || weeks < 1)) weeks = null;\nconst bloc = typeof q.bloc === 'string' && q.bloc.trim().length > 0 ? q.bloc.trim() : null;\nreturn [{ json: { limit, weeks, bloc } }];"
+      },
+      "id": "pt-get-parse",
+      "name": "Parse Query Params",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT powertrack_coach_summary($1::int, $2::int, $3::text) AS summary;",
+        "options": {
+          "queryReplacement": "={{ [$json.limit, $json.weeks, $json.bloc] }}"
+        }
+      },
+      "id": "pt-get-pg-query",
+      "name": "Postgres Coach Summary",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        480,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "ptPostgresCred01",
+          "name": "Postgres PowerTrack"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.summary) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "pt-get-respond",
+      "name": "Respond Coach Summary",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        720,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook Coach Summary GET": {
+      "main": [
+        [
+          {
+            "node": "Parse Query Params",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Query Params": {
+      "main": [
+        [
+          {
+            "node": "Postgres Coach Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres Coach Summary": {
+      "main": [
+        [
+          {
+            "node": "Respond Coach Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}
