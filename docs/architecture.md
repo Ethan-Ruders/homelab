@@ -65,3 +65,11 @@ La stack [`stacks/monitoring/docker-compose.yml`](../stacks/monitoring/docker-co
 - **`node-exporter`** : collecte les métriques système de `Serveur-Linux` (`/proc`, `/sys`, `/` en lecture seule).
 - **`prometheus`** : interroge `localhost:9090` et `node-exporter:9100` toutes les `15s` ([`prometheus.yml`](../stacks/monitoring/prometheus.yml)).
 - **`grafana`** : exposé derrière `https://grafana.homelab` avec persistance dans le volume `grafana_data`.
+
+---
+
+## 5. Portail d'accueil (`https://homelab`)
+
+La stack [`stacks/homepage/docker-compose.yml`](../stacks/homepage/docker-compose.yml) exécute **Homepage** sur `homelab-net` :
+- **Exposition HTTPS :** résolu localement via une réécriture AdGuard dédiée (`homelab`) et routé par Nginx Proxy Manager avec le certificat SAN (`npm-1`).
+- **Widgets & supervision légère :** affiche les ressources système de `Serveur-Linux` (CPU, RAM, disque `/`, uptime) et interroge `/var/run/docker.sock` en lecture seule (`:ro`) pour indiquer l'état en direct de chaque conteneur.

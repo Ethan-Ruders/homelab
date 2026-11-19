@@ -1,0 +1,18 @@
+title: Homelab
+theme: dark
+color: slate
+language: fr
+headerStyle: boxedWidgets
+statusStyle: dot
+showStats: true
+hideVersion: true
+layout:
+  Infrastructure & Réseau:
+    style: row
+    columns: 4
+  Applications & Données:
+    style: row
+    columns: 4
+  Monitoring & Outils:
+    style: row
+    columns: 4

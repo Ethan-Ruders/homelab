@@ -1,0 +1,9 @@
+- Dépôts GitHub:
+    - Homelab:
+        - abbr: HL
+          href: https://github.com/Ethan-Ruders/homelab
+          description: Infra-as-Code & scripts du serveur
+    - PowerTrack:
+        - abbr: PT
+          href: https://github.com/Ethan-Ruders/PowerTrack
+          description: Application iOS Powerlifting

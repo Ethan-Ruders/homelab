@@ -1,0 +1,71 @@
+- Infrastructure & Réseau:
+    - Proxmox VE:
+        icon: proxmox.svg
+        href: https://proxmox.homelab
+        description: Hyperviseur KVM & snapshots vzdump
+    - OPNsense:
+        icon: opnsense.svg
+        href: https://opnsense.homelab
+        description: Pare-feu & VPN WireGuard
+    - Nginx Proxy Manager:
+        icon: nginx-proxy-manager.svg
+        href: https://npm.homelab
+        description: Reverse proxy HTTPS & certificats
+        server: my-docker
+        container: nginx-proxy-manager
+    - AdGuard Home:
+        icon: adguard-home.svg
+        href: https://adguard.homelab
+        description: DNS local *.homelab & filtrage
+        server: my-docker
+        container: adguard-home
+
+- Applications & Données:
+    - n8n:
+        icon: n8n.svg
+        href: https://n8n.homelab
+        description: Automatisations & webhooks PowerTrack
+        server: my-docker
+        container: n8n
+    - Gitea:
+        icon: gitea.svg
+        href: https://gitea.homelab
+        description: Forge Git auto-hébergée
+        server: my-docker
+        container: gitea
+    - Metabase:
+        icon: metabase.svg
+        href: https://metabase.homelab
+        description: Exploration SQL (à la demande)
+        server: my-docker
+        container: metabase
+    - PostgreSQL:
+        icon: postgres.svg
+        description: postgres-force (interne homelab-net)
+        server: my-docker
+        container: postgres-force
+
+- Monitoring & Outils:
+    - Grafana:
+        icon: grafana.svg
+        href: https://grafana.homelab
+        description: Tableaux de bord & métriques
+        server: my-docker
+        container: grafana
+    - Prometheus:
+        icon: prometheus.svg
+        href: https://prometheus.homelab
+        description: Collecte métriques système
+        server: my-docker
+        container: prometheus
+    - Node Exporter:
+        icon: prometheus.svg
+        description: Sondes CPU / RAM / Disque
+        server: my-docker
+        container: node-exporter
+    - Anisette:
+        icon: apple.svg
+        href: https://anisette.homelab
+        description: Serveur SideStore (optionnel)
+        server: my-docker
+        container: anisette

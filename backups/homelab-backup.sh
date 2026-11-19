@@ -19,6 +19,7 @@ mkdir -p \
     "$STAGE/carnet-force" \
     "$STAGE/monitoring" \
     "$STAGE/gitea" \
+    "$STAGE/homepage" \
     "$STAGE/adguard"
 
 backup_sqlite() {
@@ -93,6 +94,13 @@ done
 
 if [ -f "/home/ethan/gitea-docker/docker-compose.yml" ]; then
     cp -a "/home/ethan/gitea-docker/docker-compose.yml" "$STAGE/gitea/docker-compose.yml"
+fi
+
+if [ -f "/home/ethan/homepage-docker/docker-compose.yml" ]; then
+    cp -a "/home/ethan/homepage-docker/docker-compose.yml" "$STAGE/homepage/docker-compose.yml"
+fi
+if [ -d "/home/ethan/homepage-docker/config" ]; then
+    cp -a "/home/ethan/homepage-docker/config" "$STAGE/homepage/config"
 fi
 
 if [ -f "/home/ethan/adguard/confdir/AdGuardHome.yaml" ]; then

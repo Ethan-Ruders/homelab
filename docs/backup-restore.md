@@ -34,6 +34,7 @@ Orchestrée par `systemd` ([`homelab-backup.timer`](../backups/systemd/homelab-b
 | `grafana/` | `grafana.db` | Copie SQLite cohérente via API Python `sqlite3` |
 | `npm/` | `database.sqlite`, `custom_ssl/` | Copie SQLite cohérente + certificats personnalisés NPM |
 | `homelab-ca/` | PKI complète (`homelab-root-ca.*`, `wildcard.homelab.*`, `.cnf`) | Copie directe préservant les permissions (`cp -a`) |
+| `homepage/` | `docker-compose.yml`, `config/` (YAML Homepage) | Copie directe préservant les permissions (`cp -a`) |
 | `carnet-force/`, `monitoring/`, `gitea/`, `adguard/`, `configs/` | `docker-compose.yml`, `.env`, `init-powertrack.sql`, `prometheus.yml`, `AdGuardHome.yaml` | Copie directe |
 
 ---

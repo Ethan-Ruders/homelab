@@ -1,0 +1,18 @@
+- greeting:
+    text_size: xl
+    text: Homelab — Serveur-Linux
+- resources:
+    label: Serveur-Linux
+    cpu: true
+    memory: true
+    disk: /
+    uptime: true
+- datetime:
+    text_size: lg
+    format:
+      dateStyle: full
+      timeStyle: short
+      hourCycle: h23
+- search:
+    provider: duckduckgo
+    target: _blank

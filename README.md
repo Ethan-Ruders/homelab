@@ -13,6 +13,7 @@ flowchart LR
     Client["App PowerTrack (iOS) / Poste Mac"] -->|"HTTPS *.homelab (LAN ou WireGuard)"| OPN["VM 100 : OPNsense-FW"]
     OPN --> AdGuard["AdGuard Home (DNS :53)"]
     OPN --> NPM["Nginx Proxy Manager (:80 / :443, TLS interne)"]
+    NPM -->|"homelab-net"| Homepage["Homepage (:3000)"]
     NPM -->|"homelab-net"| N8N["n8n (:5678)"]
     NPM -->|"homelab-net"| Grafana["Grafana (:3000)"]
     NPM -->|"homelab-net"| Gitea["Gitea (:3000, SSH :222)"]
@@ -27,6 +28,7 @@ flowchart LR
 
 | Service | Conteneur / Hôte | Domaine SAN | Rôle | Statut |
 | :--- | :--- | :--- | :--- | :--- |
+| Portail d'accueil | `homepage` | `homelab` | Page d'accueil centralisée & état Docker en direct | Actif |
 | Reverse Proxy | `nginx-proxy-manager` | `npm.homelab` | Terminaison TLS & routage HTTPS (`127.0.0.1:81` pour l'admin) | Actif |
 | DNS local | `adguard-home` | `adguard.homelab` | Résolution `*.homelab` et filtrage DNS (`:53`) | Actif |
 | Automatisation | `n8n` | `n8n.homelab` | Webhooks PowerTrack (`POST` ingestion / `GET` coach summary) | Actif |
@@ -53,6 +55,7 @@ flowchart LR
 | [`stacks/n8n/docker-compose.yml`](stacks/n8n/docker-compose.yml) | `/home/ethan/n8n-docker/docker-compose.yml` | Service `n8n` derrière `https://n8n.homelab/` |
 | [`stacks/n8n/workflows/`](stacks/n8n/workflows/powertrack-post.json) | Base `n8n` (exports nettoyés) | Workflows PowerTrack `POST` et `GET` |
 | [`stacks/gitea/docker-compose.yml`](stacks/gitea/docker-compose.yml) | `/home/ethan/gitea-docker/docker-compose.yml` | Forge Gitea interne |
+| [`stacks/homepage/`](stacks/homepage/docker-compose.yml) | `/home/ethan/homepage-docker/` | Page d'accueil Homepage et fichiers YAML |
 | [`stacks/anisette/docker-compose.yml`](stacks/anisette/docker-compose.yml) | `/home/ethan/anisette-docker/docker-compose.yml` | Conteneur `anisette-v3-server` (optionnel) |
 | [`pki/`](pki/ca.cnf) | `/home/ethan/homelab-ca/` | Modèles OpenSSL Root CA (`ca.cnf`) et certificat SAN (`leaf.cnf`) |
 | [`backups/homelab-backup.sh`](backups/homelab-backup.sh) | `/usr/local/sbin/homelab-backup.sh` | Script de sauvegarde logique quotidienne (VM 101) |
