@@ -1,0 +1,7 @@
+[Unit]
+Description=Send Discord alert when Homelab daily backup fails
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/homelab-health-alert.sh --backup-failed

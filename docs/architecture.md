@@ -63,8 +63,9 @@ sequenceDiagram
 
 La stack [`stacks/monitoring/docker-compose.yml`](../stacks/monitoring/docker-compose.yml) regroupe :
 - **`node-exporter`** : collecte les métriques système de `Serveur-Linux` (`/proc`, `/sys`, `/` en lecture seule).
-- **`prometheus`** : interroge `localhost:9090` et `node-exporter:9100` toutes les `15s` ([`prometheus.yml`](../stacks/monitoring/prometheus.yml)).
-- **`grafana`** : exposé derrière `https://grafana.homelab` avec persistance dans le volume `grafana_data`.
+- **`cadvisor`** : collecte l'utilisation CPU, RAM et réseau par conteneur Docker (`--docker_only=true`, connecté à `default` et `homelab-net`).
+- **`prometheus`** : interroge `localhost:9090`, `node-exporter:9100` et `cadvisor:8080` toutes les `15s` ([`prometheus.yml`](../stacks/monitoring/prometheus.yml)).
+- **`grafana`** : exposé derrière `https://grafana.homelab` avec persistance dans `grafana_data` et deux dashboards ([Système Node Exporter](../stacks/monitoring/dashboards/node-exporter.json) et [Conteneurs cAdvisor](../stacks/monitoring/dashboards/docker-cadvisor.json)).
 
 ---
 
@@ -72,4 +73,14 @@ La stack [`stacks/monitoring/docker-compose.yml`](../stacks/monitoring/docker-co
 
 La stack [`stacks/homepage/docker-compose.yml`](../stacks/homepage/docker-compose.yml) exécute **Homepage** sur `homelab-net` :
 - **Exposition HTTPS :** résolu localement via une réécriture AdGuard dédiée (`homelab`) et routé par Nginx Proxy Manager avec le certificat SAN (`npm-1`).
-- **Widgets & supervision légère :** affiche les ressources système de `Serveur-Linux` (CPU, RAM, disque `/`, uptime) et interroge `/var/run/docker.sock` en lecture seule (`:ro`) pour indiquer l'état en direct de chaque conteneur.
+- **Widgets & supervision :** affiche les ressources système de `Serveur-Linux` (CPU, RAM, disque `/`, uptime), interroge `/var/run/docker.sock` en lecture seule (`:ro`) pour chaque conteneur, et intègre les widgets temps réel **Proxmox VE** (token lecture seule `PVEAuditor` via `.env`), **AdGuard Home** et **Prometheus**.
+
+---
+
+## 6. Automatisation Discord (`n8n`) et mises à jour de sécurité
+
+- **Mises à jour de sécurité APT :** `unattended-upgrades` complété par [`system/51homelab-unattended`](../system/51homelab-unattended) (nettoyage automatique des paquets inutilisés, sans redémarrage automatique).
+- **Surveillance & veille automatisées :**
+  - [`homelab-alerts.json`](../stacks/n8n/workflows/homelab-alerts.json) : contrôle toutes les 10 minutes les services sur `homelab-net` + PostgreSQL, et n'alerte Discord qu'en cas de changement d'état (anti-spam).
+  - [`homelab-backup-alert.json`](../stacks/n8n/workflows/homelab-backup-alert.json) : webhook sécurisé (`X-API-Key`) utilisé par [`homelab-health-alert.sh`](../backups/homelab-health-alert.sh) lors des alertes `OnFailure` de backup ou du contrôle quotidien `08:00` (fraîcheur backup < 26 h, certificat `wildcard.homelab.crt` > 30 j, disque < 85 %).
+  - [`homelab-veille-ia-cyber.json`](../stacks/n8n/workflows/homelab-veille-ia-cyber.json) : veille hebdomadaire IA (Hugging Face, OpenAI, DeepMind, Simon Willison) & Cybersécurité (CERT-FR, The Hacker News, BleepingComputer) publiée chaque dimanche à `10:00` (`Europe/Paris`) sur Discord.

@@ -18,7 +18,9 @@ flowchart LR
     NPM -->|"homelab-net"| Grafana["Grafana (:3000)"]
     NPM -->|"homelab-net"| Gitea["Gitea (:3000, SSH :222)"]
     N8N -->|"SQL + Upsert seance_id"| PG["postgres-force (PostgreSQL 15)"]
+    N8N -->|"Alertes & Veille"| Discord["Discord (#général)"]
     Prom["Prometheus (:9090 localhost)"] --> NodeExp["node-exporter (:9100)"]
+    Prom --> cAdvisor["cAdvisor (:8080)"]
     Grafana --> Prom
 ```
 
@@ -28,13 +30,13 @@ flowchart LR
 
 | Service | Conteneur / Hôte | Domaine SAN | Rôle | Statut |
 | :--- | :--- | :--- | :--- | :--- |
-| Portail d'accueil | `homepage` | `homelab` | Page d'accueil centralisée & état Docker en direct | Actif |
+| Portail d'accueil | `homepage` | `homelab` | Page d'accueil centralisée & widgets en direct (Proxmox, AdGuard, Prometheus, Docker) | Actif |
 | Reverse Proxy | `nginx-proxy-manager` | `npm.homelab` | Terminaison TLS & routage HTTPS (`127.0.0.1:81` pour l'admin) | Actif |
 | DNS local | `adguard-home` | `adguard.homelab` | Résolution `*.homelab` et filtrage DNS (`:53`) | Actif |
-| Automatisation | `n8n` | `n8n.homelab` | Webhooks PowerTrack (`POST` ingestion / `GET` coach summary) | Actif |
+| Automatisation | `n8n` | `n8n.homelab` | Webhooks PowerTrack (`POST`/`GET`), surveillance services, alertes backup & veille hebdo IA/Cyber | Actif |
 | Base de données | `postgres-force` | *(réseau interne `homelab-net`)* | PostgreSQL 15 (`powertrack`, `db_entrainement`), non exposé hors Docker | Actif |
-| Visualisation | `grafana` | `grafana.homelab` | Tableaux de bord système & entraînement | Actif |
-| Métriques | `prometheus` / `node-exporter` | `prometheus.homelab` | Collecte métriques hôte (`127.0.0.1:9090` côté hôte) | Actif |
+| Visualisation | `grafana` | `grafana.homelab` | Dashboards système Linux (`Node Exporter`) & conteneurs (`cAdvisor`) | Actif |
+| Métriques | `prometheus` / `node-exporter` / `cadvisor` | `prometheus.homelab` | Collecte métriques hôte et conteneurs Docker | Actif |
 | Forge Git | `gitea` | `gitea.homelab` | Dépôts Git locaux (SSH sur port `222`) | Actif |
 | BI / Exploration | `metabase` | `metabase.homelab` | Exploration SQL (`restart: "no"`, démarré à la demande) | À la demande |
 | Pare-feu / VPN | VM 100 (`OPNsense-FW`) | `opnsense.homelab` | Routage, pare-feu et tunnel WireGuard | Actif |
@@ -51,16 +53,18 @@ flowchart LR
 | [`stacks/carnet-force/docker-compose.yml`](stacks/carnet-force/docker-compose.yml) | `/home/ethan/carnet-force/docker-compose.yml` | Stack PostgreSQL 15 (`postgres-force`) et Metabase |
 | [`stacks/carnet-force/.env.example`](stacks/carnet-force/.env.example) | `/home/ethan/carnet-force/.env` *(non suivi)* | Modèle de variables d'environnement PostgreSQL |
 | [`stacks/carnet-force/init-powertrack.sql`](stacks/carnet-force/init-powertrack.sql) | `/home/ethan/carnet-force/init-powertrack.sql` | Schéma SQL, fonctions d'upsert, alertes et vues PowerTrack |
-| [`stacks/monitoring/`](stacks/monitoring/docker-compose.yml) | `/home/ethan/monitoring/` | Prometheus, Grafana et Node Exporter |
+| [`stacks/monitoring/`](stacks/monitoring/docker-compose.yml) | `/home/ethan/monitoring/` | Prometheus, Grafana, Node Exporter et cAdvisor |
 | [`stacks/n8n/docker-compose.yml`](stacks/n8n/docker-compose.yml) | `/home/ethan/n8n-docker/docker-compose.yml` | Service `n8n` derrière `https://n8n.homelab/` |
-| [`stacks/n8n/workflows/`](stacks/n8n/workflows/powertrack-post.json) | Base `n8n` (exports nettoyés) | Workflows PowerTrack `POST` et `GET` |
+| [`stacks/n8n/workflows/`](stacks/n8n/workflows/powertrack-post.json) | Base `n8n` (exports nettoyés) | Workflows PowerTrack, alertes Discord et veille IA/Cyber |
 | [`stacks/gitea/docker-compose.yml`](stacks/gitea/docker-compose.yml) | `/home/ethan/gitea-docker/docker-compose.yml` | Forge Gitea interne |
-| [`stacks/homepage/`](stacks/homepage/docker-compose.yml) | `/home/ethan/homepage-docker/` | Page d'accueil Homepage et fichiers YAML |
+| [`stacks/homepage/`](stacks/homepage/docker-compose.yml) | `/home/ethan/homepage-docker/` | Page d'accueil Homepage, `.env.example` et fichiers YAML |
 | [`stacks/anisette/docker-compose.yml`](stacks/anisette/docker-compose.yml) | `/home/ethan/anisette-docker/docker-compose.yml` | Conteneur `anisette-v3-server` (optionnel) |
 | [`pki/`](pki/ca.cnf) | `/home/ethan/homelab-ca/` | Modèles OpenSSL Root CA (`ca.cnf`) et certificat SAN (`leaf.cnf`) |
 | [`backups/homelab-backup.sh`](backups/homelab-backup.sh) | `/usr/local/sbin/homelab-backup.sh` | Script de sauvegarde logique quotidienne (VM 101) |
-| [`backups/systemd/`](backups/systemd/homelab-backup.timer) | `/etc/systemd/system/` | Unité `oneshot` et timer quotidien `03:30` UTC |
+| [`backups/homelab-health-alert.sh`](backups/homelab-health-alert.sh) | `/usr/local/sbin/homelab-health-alert.sh` | Contrôle quotidien (backup, TLS, disque) & alertes `OnFailure` |
+| [`backups/systemd/`](backups/systemd/homelab-backup.timer) | `/etc/systemd/system/` | Services & timers quotidiens (`03:30` backup, `08:00` santé) |
 | [`backups/proxmox/jobs.cfg`](backups/proxmox/jobs.cfg) | `/etc/pve/jobs.cfg` *(hôte Proxmox)* | Tâche hebdomadaire `vzdump` des VM 100 et 101 |
+| [`system/51homelab-unattended`](system/51homelab-unattended) | `/etc/apt/apt.conf.d/51homelab-unattended` | Mises à jour de sécurité APT automatiques (sans reboot auto) |
 
 ---
 

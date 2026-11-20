@@ -1,0 +1,7 @@
+[Unit]
+Description=Daily Homelab health check (backup freshness, TLS cert expiry, disk space)
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/homelab-health-alert.sh --daily-check

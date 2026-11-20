@@ -3,6 +3,12 @@
         icon: proxmox.svg
         href: https://proxmox.homelab
         description: Hyperviseur KVM & snapshots vzdump
+        widget:
+          type: proxmox
+          url: "{{HOMEPAGE_VAR_PROXMOX_URL}}"
+          username: "{{HOMEPAGE_VAR_PROXMOX_TOKEN_ID}}"
+          password: "{{HOMEPAGE_VAR_PROXMOX_TOKEN_SECRET}}"
+          node: pve
     - OPNsense:
         icon: opnsense.svg
         href: https://opnsense.homelab
@@ -19,6 +25,11 @@
         description: DNS local *.homelab & filtrage
         server: my-docker
         container: adguard-home
+        widget:
+          type: adguard
+          url: http://adguard-home:80
+          username: "{{HOMEPAGE_VAR_ADGUARD_USER}}"
+          password: "{{HOMEPAGE_VAR_ADGUARD_PASSWORD}}"
 
 - Applications & Données:
     - n8n:
@@ -58,6 +69,14 @@
         description: Collecte métriques système
         server: my-docker
         container: prometheus
+        widget:
+          type: prometheus
+          url: http://prometheus:9090
+    - cAdvisor:
+        icon: cadvisor.svg
+        description: Métriques conteneurs Docker
+        server: my-docker
+        container: cadvisor
     - Node Exporter:
         icon: prometheus.svg
         description: Sondes CPU / RAM / Disque

@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Homelab daily health check at 08:00
+
+[Timer]
+OnCalendar=*-*-* 08:00:00
+RandomizedDelaySec=2m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

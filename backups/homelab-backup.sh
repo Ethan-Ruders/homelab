@@ -16,6 +16,7 @@ mkdir -p \
     "$STAGE/grafana" \
     "$STAGE/npm" \
     "$STAGE/configs" \
+    "$STAGE/configs/systemd" \
     "$STAGE/carnet-force" \
     "$STAGE/monitoring" \
     "$STAGE/gitea" \
@@ -99,9 +100,24 @@ fi
 if [ -f "/home/ethan/homepage-docker/docker-compose.yml" ]; then
     cp -a "/home/ethan/homepage-docker/docker-compose.yml" "$STAGE/homepage/docker-compose.yml"
 fi
+if [ -f "/home/ethan/homepage-docker/.env" ]; then
+    cp -a "/home/ethan/homepage-docker/.env" "$STAGE/homepage/.env"
+fi
 if [ -d "/home/ethan/homepage-docker/config" ]; then
     cp -a "/home/ethan/homepage-docker/config" "$STAGE/homepage/config"
 fi
+
+if [ -f "/usr/local/sbin/homelab-health-alert.sh" ]; then
+    cp -a "/usr/local/sbin/homelab-health-alert.sh" "$STAGE/configs/homelab-health-alert.sh"
+fi
+if [ -f "/etc/apt/apt.conf.d/51homelab-unattended" ]; then
+    cp -a "/etc/apt/apt.conf.d/51homelab-unattended" "$STAGE/configs/51homelab-unattended"
+fi
+for unit in homelab-backup.service homelab-backup.timer homelab-backup-alert.service homelab-cert-check.service homelab-cert-check.timer; do
+    if [ -f "/etc/systemd/system/$unit" ]; then
+        cp -a "/etc/systemd/system/$unit" "$STAGE/configs/systemd/$unit"
+    fi
+done
 
 if [ -f "/home/ethan/adguard/confdir/AdGuardHome.yaml" ]; then
     cp -a "/home/ethan/adguard/confdir/AdGuardHome.yaml" "$STAGE/adguard/AdGuardHome.yaml"

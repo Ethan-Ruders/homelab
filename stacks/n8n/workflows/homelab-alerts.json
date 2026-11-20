@@ -1,0 +1,161 @@
+{
+  "name": "Homelab - Surveillance Services (Discord)",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 10
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "id": "hl-alert-schedule",
+      "name": "Toutes les 10 minutes"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        220
+      ],
+      "id": "hl-alert-manual",
+      "name": "Déclenchement Manuel / CLI"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT 1 AS ok;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        240,
+        0
+      ],
+      "id": "hl-alert-postgres",
+      "name": "Check Postgres",
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "postgres": {
+          "id": "ptPostgresCred01",
+          "name": "Postgres PowerTrack"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const pgRow = $input.first()?.json || {};\nconst pgOk = pgRow.ok === 1 && !pgRow.error;\n\nconst checks = [\n  { name: 'Homepage', url: 'http://homepage:3000/', headers: { Host: 'homelab' }, maxStatus: 399 },\n  { name: 'Grafana', url: 'http://grafana:3000/api/health', maxStatus: 299 },\n  { name: 'Gitea', url: 'http://gitea:3000/api/healthz', maxStatus: 299 },\n  { name: 'Prometheus', url: 'http://prometheus:9090/-/healthy', maxStatus: 299 },\n  { name: 'cAdvisor', url: 'http://cadvisor:8080/healthz', maxStatus: 299 },\n  { name: 'AdGuard Home', url: 'http://adguard-home:80/', maxStatus: 399 },\n  { name: 'Nginx Proxy Manager', url: 'http://nginx-proxy-manager:81/api/', maxStatus: 299 },\n];\n\nconst downDetails = [];\nif (!pgOk) {\n  downDetails.push(`• **PostgreSQL (postgres-force)** : ${pgRow.error?.message || 'requête SELECT 1 échouée'}`);\n}\n\nfor (const svc of checks) {\n  try {\n    const res = await this.helpers.httpRequest({\n      method: 'GET',\n      url: svc.url,\n      headers: svc.headers || {},\n      timeout: 5000,\n      returnFullResponse: true,\n      ignoreHttpStatusErrors: true,\n    });\n    const code = Number(res?.statusCode ?? 0);\n    if (!code || code > svc.maxStatus) {\n      downDetails.push(`• **${svc.name}** : HTTP ${code || 'inconnu'}`);\n    }\n  } catch (err) {\n    downDetails.push(`• **${svc.name}** : ${err.message || 'injoignable'}`);\n  }\n}\n\nconst downNames = downDetails\n  .map((line) => line.match(/\\*\\*(.+?)\\*\\*/)?.[1] || line)\n  .sort();\n\nconst staticData = $getWorkflowStaticData('global');\nconst prevDown = Array.isArray(staticData.prevDown) ? staticData.prevDown : [];\n\nif (JSON.stringify(downNames) === JSON.stringify(prevDown)) {\n  return [];\n}\n\nstaticData.prevDown = downNames;\n\nif (downDetails.length > 0) {\n  const msg = [\n    '🚨 **Alerte Homelab — Service(s) indisponible(s)**',\n    ...downDetails,\n  ].join('\\n').slice(0, 1900);\n  return [{ json: { message: msg, down: downNames } }];\n}\n\nreturn [{\n  json: {\n    message: '✅ **Homelab rétabli** — Tous les services surveillés répondent normalement.',\n    down: [],\n  },\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ],
+      "id": "hl-alert-check",
+      "name": "Check Services & Diff State"
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "guildId": {
+          "__rl": true,
+          "value": "YOUR_DISCORD_GUILD_ID",
+          "mode": "list",
+          "cachedResultName": "n8n",
+          "cachedResultUrl": "https://discord.com/channels/YOUR_DISCORD_GUILD_ID"
+        },
+        "channelId": {
+          "__rl": true,
+          "value": "YOUR_DISCORD_CHANNEL_ID",
+          "mode": "list",
+          "cachedResultName": "général",
+          "cachedResultUrl": "https://discord.com/channels/YOUR_DISCORD_GUILD_ID/YOUR_DISCORD_CHANNEL_ID"
+        },
+        "content": "={{ $json.message }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [
+        740,
+        0
+      ],
+      "id": "hl-alert-discord",
+      "name": "Envoyer alerte Discord",
+      "credentials": {
+        "discordBotApi": {
+          "id": "tyT57vWVjdJ9LpWt",
+          "name": "Discord Bot account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Toutes les 10 minutes": {
+      "main": [
+        [
+          {
+            "node": "Check Postgres",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Déclenchement Manuel / CLI": {
+      "main": [
+        [
+          {
+            "node": "Check Postgres",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Postgres": {
+      "main": [
+        [
+          {
+            "node": "Check Services & Diff State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Services & Diff State": {
+      "main": [
+        [
+          {
+            "node": "Envoyer alerte Discord",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

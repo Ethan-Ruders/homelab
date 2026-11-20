@@ -3,6 +3,8 @@ services:
     image: ghcr.io/gethomepage/homepage:latest
     container_name: homepage
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       - HOMEPAGE_ALLOWED_HOSTS=homelab,homepage:3000
       - TZ=Europe/Paris

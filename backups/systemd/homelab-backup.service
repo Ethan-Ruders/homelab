@@ -2,6 +2,7 @@
 Description=Daily logical backup of Homelab (Postgres PowerTrack, n8n, Grafana, NPM, CA, configs)
 After=docker.service
 Requires=docker.service
+OnFailure=homelab-backup-alert.service
 
 [Service]
 Type=oneshot

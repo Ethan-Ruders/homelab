@@ -1,0 +1,136 @@
+{
+  "name": "Homelab - Alertes Système & Backup (Webhook)",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "homelab-alert",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "hl-wh-trigger",
+      "name": "Webhook Homelab Alert",
+      "webhookId": "homelab-alert-webhook",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ptHeaderAuth0001",
+          "name": "PowerTrack API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const item = $input.first();\nlet body = item?.json?.body ?? item?.json ?? {};\nif (typeof body === 'string') {\n  try {\n    body = JSON.parse(body);\n  } catch (_) {\n    body = { details: body };\n  }\n}\n\nconst severity = String(body.severity || 'warning').toLowerCase();\nconst icon = severity === 'critical' ? '🚨' : severity === 'ok' ? '✅' : '⚠️';\nconst title = String(body.title || 'Notification Homelab').trim();\nconst details = String(body.details || '').trim();\n\nlet message = `${icon} **${title}**`;\nif (details) {\n  message += `\\n${details}`;\n}\nif (message.length > 1900) {\n  message = `${message.slice(0, 1890)}\\n…`;\n}\n\nreturn [{ json: { message, severity, title } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "id": "hl-wh-format",
+      "name": "Format Alert"
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "guildId": {
+          "__rl": true,
+          "value": "YOUR_DISCORD_GUILD_ID",
+          "mode": "list",
+          "cachedResultName": "n8n",
+          "cachedResultUrl": "https://discord.com/channels/YOUR_DISCORD_GUILD_ID"
+        },
+        "channelId": {
+          "__rl": true,
+          "value": "YOUR_DISCORD_CHANNEL_ID",
+          "mode": "list",
+          "cachedResultName": "général",
+          "cachedResultUrl": "https://discord.com/channels/YOUR_DISCORD_GUILD_ID/YOUR_DISCORD_CHANNEL_ID"
+        },
+        "content": "={{ $json.message }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [
+        500,
+        0
+      ],
+      "id": "hl-wh-discord",
+      "name": "Envoyer alerte Discord",
+      "credentials": {
+        "discordBotApi": {
+          "id": "tyT57vWVjdJ9LpWt",
+          "name": "Discord Bot account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'sent' }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        760,
+        0
+      ],
+      "id": "hl-wh-respond",
+      "name": "Respond Sent"
+    }
+  ],
+  "connections": {
+    "Webhook Homelab Alert": {
+      "main": [
+        [
+          {
+            "node": "Format Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Alert": {
+      "main": [
+        [
+          {
+            "node": "Envoyer alerte Discord",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Envoyer alerte Discord": {
+      "main": [
+        [
+          {
+            "node": "Respond Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

@@ -34,8 +34,15 @@ Orchestrée par `systemd` ([`homelab-backup.timer`](../backups/systemd/homelab-b
 | `grafana/` | `grafana.db` | Copie SQLite cohérente via API Python `sqlite3` |
 | `npm/` | `database.sqlite`, `custom_ssl/` | Copie SQLite cohérente + certificats personnalisés NPM |
 | `homelab-ca/` | PKI complète (`homelab-root-ca.*`, `wildcard.homelab.*`, `.cnf`) | Copie directe préservant les permissions (`cp -a`) |
-| `homepage/` | `docker-compose.yml`, `config/` (YAML Homepage) | Copie directe préservant les permissions (`cp -a`) |
-| `carnet-force/`, `monitoring/`, `gitea/`, `adguard/`, `configs/` | `docker-compose.yml`, `.env`, `init-powertrack.sql`, `prometheus.yml`, `AdGuardHome.yaml` | Copie directe |
+| `homepage/` | `docker-compose.yml`, `.env`, `config/` (YAML Homepage) | Copie directe préservant les permissions (`cp -a`) |
+| `carnet-force/`, `monitoring/`, `gitea/`, `adguard/`, `configs/` | `docker-compose.yml`, `.env`, `init-powertrack.sql`, `prometheus.yml`, `AdGuardHome.yaml`, scripts `/usr/local/sbin/homelab-*`, unités `systemd/homelab-*`, `51homelab-unattended` | Copie directe |
+
+---
+
+## 2 bis. Alertes automatiques (échec backup, TLS & disque)
+
+- En cas d'échec de `homelab-backup.service`, `OnFailure=homelab-backup-alert.service` déclenche [`homelab-health-alert.sh`](../backups/homelab-health-alert.sh) (`--backup-failed`) pour envoyer les 10 dernières lignes `journalctl` vers Discord via `n8n`.
+- Chaque matin à `08:00` (`homelab-cert-check.timer`), `--daily-check` vérifie que `latest.tar.gz` a moins de 26 h, que `wildcard.homelab.crt` expire dans plus de 30 jours et que `/` est sous 85 % d'occupation.
 
 ---
 
