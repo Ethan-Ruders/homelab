@@ -32,6 +32,12 @@
           password: "{{HOMEPAGE_VAR_ADGUARD_PASSWORD}}"
 
 - Applications & Données:
+    - Career Radar:
+        icon: mdi-briefcase-search
+        href: https://carriere.homelab
+        description: Veille & suivi stages/alternances Cyber, IA, SysRes + Excel
+        server: my-docker
+        container: homelab-carriere
     - n8n:
         icon: n8n.svg
         href: https://n8n.homelab

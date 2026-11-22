@@ -1,0 +1,14 @@
+services:
+  homelab-carriere:
+    build: .
+    image: homelab-carriere:local
+    container_name: homelab-carriere
+    restart: unless-stopped
+    env_file:
+      - .env
+    networks:
+      - homelab-net
+
+networks:
+  homelab-net:
+    external: true

@@ -1,0 +1,408 @@
+{
+  "name": "Homelab - Radar Stages & Alternance (Discord)",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9,18 * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "id": "hl-car-schedule",
+      "name": "Planification 09h & 18h"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        220
+      ],
+      "id": "hl-car-manual",
+      "name": "Déclenchement Manuel / CLI"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://homelab-carriere:8000/api/internal/collect-offers",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        260,
+        0
+      ],
+      "id": "hl-car-collect",
+      "name": "Collecter Offres",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "hlCarriereApiKey01",
+          "name": "Homelab Carriere API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const data = $input.first()?.json || {};\nconst unscored = Array.isArray(data.unscored_offers) ? data.unscored_offers : [];\n\nif (unscored.length === 0) {\n  return [{ json: { hasUnscored: false, scores: [] } }];\n}\n\nconst compactOffers = unscored.map((o) => ({\n  id: o.id,\n  contrat: o.type_contrat,\n  zone: o.zone,\n  ville: o.ville,\n  trajet: o.trajet_tranche,\n  entreprise: o.entreprise_nom,\n  taille: o.taille_categorie,\n  activite_connue: (o.entreprise_resume || o.libelle_naf || '').slice(0, 220),\n  titre: o.titre,\n  description: (o.description || '').slice(0, 900),\n}));\n\nconst prompt = [\n  \"Tu es l'assistant carriere d'Ethan, etudiant en 1re annee d'ecole d'ingenieur informatique.\",\n  \"Profil cible : stage de fin d'annee ete 2027 OU alternance de 2 ans (septembre 2027 -> 2029) autour de Loperhet/Brest, Lannion ou Caen.\",\n  'Priorites techniques :',\n  '1. TRES HAUTE PRIORITE (80-100) : Cybersecurite (SOC, pentest, DevSecOps, SecOps, defense, cyber maritime/reseau), Intelligence Artificielle / ML / Data Engineering, et Systemes & Reseaux / Infra / Cloud / Linux.',\n  '2. PERTINENT (60-79) : Developpement logiciel, DevOps, architecture SI, R&D tech — surtout dans les grands groupes/ETI (Thales, Naval Group, Nokia, Orange, Arkea, Sopra Steria, Capgemini, NXP, Exail, Ekinops, Ifremer, CNRS...).',\n  '3. MOYEN / FAIBLE (30-54) : Systemes embarques ou electronique pure sans volet cyber/IA/reseau, ou support niveau 1 peu formateur.',\n  '4. HORS SUJET (0-29) : Metier non informatique, CDI senior exigeant 3+ ans d experience sans mention stage/alternance, domaine commercial pur.',\n  '',\n  'Pour CHAQUE offre ci-dessous, retourne UNIQUEMENT un JSON valide : {\"scores\": [{\"id\": <entier>, \"score_ia\": <0-100>, \"domaine_ia\": \"<Cyber|IA|SysRes|Dev|Tech|Embarque|Hors-sujet>\", \"resume_ia\": \"<2 phrases courtes en francais sur les missions, la stack et pourquoi ca matche>\", \"entreprise_resume\": \"<1 phrase claire en francais expliquant ce que fait reellement cette entreprise>\"}]}.',\n  '',\n  JSON.stringify(compactOffers),\n].join('\\n');\n\nconst geminiBody = {\n  contents: [{ role: 'user', parts: [{ text: prompt }] }],\n  generationConfig: {\n    responseMimeType: 'application/json',\n    temperature: 0.2,\n    maxOutputTokens: 8192,\n    thinkingConfig: { thinkingBudget: 256 },\n  },\n};\n\nreturn [{ json: { hasUnscored: true, geminiBody } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        0
+      ],
+      "id": "hl-car-prep-score",
+      "name": "Préparer Scoring Gemini"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-unscored",
+              "leftValue": "={{ $json.hasUnscored }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        780,
+        0
+      ],
+      "id": "hl-car-if",
+      "name": "Offres à scorer ?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.geminiBody) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1040,
+        -120
+      ],
+      "id": "hl-car-gemini",
+      "name": "Scorer Offres (Gemini)",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 4000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "hlGeminiApiKey01",
+          "name": "Veille Gemini API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const resp = $input.first()?.json || {};\nconst parts = resp?.candidates?.[0]?.content?.parts || [];\nconst rawText = parts\n  .filter((p) => !p.thought && typeof p.text === 'string')\n  .map((p) => p.text)\n  .join('')\n  .trim();\n\nif (!rawText) {\n  throw new Error('Reponse Gemini scoring vide : ' + JSON.stringify(resp).slice(0, 400));\n}\n\nconst cleanJson = rawText\n  .replace(/^```(?:json)?\\s*/i, '')\n  .replace(/\\s*```$/i, '')\n  .trim();\n\nconst parsed = JSON.parse(cleanJson);\nconst scores = Array.isArray(parsed?.scores) ? parsed.scores : [];\nreturn [{ json: { scores } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1300,
+        -120
+      ],
+      "id": "hl-car-parse-score",
+      "name": "Parser Scores Gemini"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://homelab-carriere:8000/api/internal/apply-scores",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ scores: $json.scores || [] }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1560,
+        0
+      ],
+      "id": "hl-car-apply-scores",
+      "name": "Enregistrer Scores",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "hlCarriereApiKey01",
+          "name": "Homelab Carriere API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const data = $input.first()?.json || {};\nconst pending = Array.isArray(data.pending_to_notify) ? data.pending_to_notify : [];\n\nif (pending.length === 0) {\n  return [];\n}\n\nconst zoneLabel = {\n  loperhet: 'Loperhet / Brest',\n  lannion: 'Lannion',\n  caen: 'Caen',\n};\n\nconst embeds = pending.map((o) => {\n  const isStage = String(o.type_contrat || '').toLowerCase() === 'stage';\n  const badge = isStage ? 'STAGE ETE 2027' : 'ALTERNANCE 2 ANS';\n  const color = isStage ? 3447003 : 5793266;\n  const zTxt = zoneLabel[o.zone] || o.zone || 'Zone cible';\n  const loc = [o.ville, zTxt, o.trajet_tranche].filter(Boolean).join(' · ');\n  const act = o.entreprise_resume ? `\\n**Entreprise :** ${String(o.entreprise_resume).slice(0, 220)}` : '';\n  const sum = o.resume_ia ? String(o.resume_ia).slice(0, 320) : 'Nouvelle offre detectee correspondant a ton profil.';\n\n  return {\n    title: `[${badge}] ${String(o.titre || '').slice(0, 180)}`,\n    url: o.url_directe,\n    color,\n    description: `**${o.entreprise_nom}**${o.taille_categorie ? ` (${o.taille_categorie})` : ''} — **${o.score_ia}/100** (${o.domaine_ia || 'Tech'})\\n${loc}${act}\\n\\n${sum}\\n\\n[Ouvrir l'offre directe](${o.url_directe}) · [Suivre sur Career Radar](https://carriere.homelab)`,\n  };\n});\n\nconst batches = [];\nfor (let i = 0; i < embeds.length; i += 5) {\n  const sliceEmbeds = embeds.slice(i, i + 5);\n  const sliceIds = pending.slice(i, i + 5).map((o) => o.id);\n  const header = i === 0\n    ? `🎯 **Radar Stage & Alternance — ${pending.length} nouvelle(s) offre(s) pertinente(s)** (<https://carriere.homelab>)`\n    : '📌 **Suite des offres détectées**';\n  batches.push({\n    json: {\n      offerIds: sliceIds,\n      payload: {\n        content: header,\n        embeds: sliceEmbeds,\n      },\n    },\n  });\n}\n\nreturn batches;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1820,
+        0
+      ],
+      "id": "hl-car-format-discord",
+      "name": "Formater Embeds Discord"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://discord.com/api/v10/channels/YOUR_DISCORD_CAREER_CHANNEL_ID/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "discordBotApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.payload) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2080,
+        0
+      ],
+      "id": "hl-car-post-discord",
+      "name": "Poster Discord (#stages-alternance)",
+      "credentials": {
+        "discordBotApi": {
+          "id": "tyT57vWVjdJ9LpWt",
+          "name": "Discord Bot account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const items = $('Formater Embeds Discord').all();\nconst ids = items.flatMap((it) => Array.isArray(it.json?.offerIds) ? it.json.offerIds : []);\nif (ids.length === 0) {\n  return [];\n}\nreturn [{ json: { ids } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2340,
+        0
+      ],
+      "id": "hl-car-collect-ids",
+      "name": "Préparer Mark Notified"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://homelab-carriere:8000/api/internal/mark-notified",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ ids: $json.ids }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2600,
+        0
+      ],
+      "id": "hl-car-mark-notified",
+      "name": "Marquer Offres Notifiées",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "hlCarriereApiKey01",
+          "name": "Homelab Carriere API Key"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Planification 09h & 18h": {
+      "main": [
+        [
+          {
+            "node": "Collecter Offres",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Déclenchement Manuel / CLI": {
+      "main": [
+        [
+          {
+            "node": "Collecter Offres",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collecter Offres": {
+      "main": [
+        [
+          {
+            "node": "Préparer Scoring Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer Scoring Gemini": {
+      "main": [
+        [
+          {
+            "node": "Offres à scorer ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Offres à scorer ?": {
+      "main": [
+        [
+          {
+            "node": "Scorer Offres (Gemini)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Enregistrer Scores",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scorer Offres (Gemini)": {
+      "main": [
+        [
+          {
+            "node": "Parser Scores Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parser Scores Gemini": {
+      "main": [
+        [
+          {
+            "node": "Enregistrer Scores",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enregistrer Scores": {
+      "main": [
+        [
+          {
+            "node": "Formater Embeds Discord",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formater Embeds Discord": {
+      "main": [
+        [
+          {
+            "node": "Poster Discord (#stages-alternance)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Poster Discord (#stages-alternance)": {
+      "main": [
+        [
+          {
+            "node": "Préparer Mark Notified",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer Mark Notified": {
+      "main": [
+        [
+          {
+            "node": "Marquer Offres Notifiées",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Paris"
+  },
+  "tags": []
+}

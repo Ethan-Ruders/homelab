@@ -29,12 +29,13 @@ Orchestrée par `systemd` ([`homelab-backup.timer`](../backups/systemd/homelab-b
 
 | Dossier dans l'archive | Données sauvegardées | Méthode |
 | :--- | :--- | :--- |
-| `postgres/` | `powertrack.dump`, `powertrack.sql`, `db_entrainement.dump` | `pg_dump -Fc` et SQL clair (`--no-owner`) via `postgres-force` |
+| `postgres/` | `powertrack.dump`, `powertrack.sql`, `carriere.dump`, `carriere.sql`, `db_entrainement.dump` | `pg_dump -Fc` et SQL clair (`--no-owner`) via `postgres-force` |
 | `n8n/` | `database.sqlite`, `config`, `docker-compose.yml`, `workflows.json` | Copie SQLite cohérente (`sqlite3.Connection.backup()`) + `n8n export:workflow --all` |
 | `grafana/` | `grafana.db` | Copie SQLite cohérente via API Python `sqlite3` |
 | `npm/` | `database.sqlite`, `custom_ssl/` | Copie SQLite cohérente + certificats personnalisés NPM |
 | `homelab-ca/` | PKI complète (`homelab-root-ca.*`, `wildcard.homelab.*`, `.cnf`) | Copie directe préservant les permissions (`cp -a`) |
 | `homepage/` | `docker-compose.yml`, `.env`, `config/` (YAML Homepage) | Copie directe préservant les permissions (`cp -a`) |
+| `carriere/` | `Dockerfile`, `docker-compose.yml`, `.env`, `init-carriere.sql`, `app/` | Copie directe préservant les permissions (`cp -a`) |
 | `carnet-force/`, `monitoring/`, `gitea/`, `adguard/`, `tts/`, `configs/` | `docker-compose.yml`, `.env`, `init-powertrack.sql`, `prometheus.yml`, `AdGuardHome.yaml`, `tts-docker/{Dockerfile,docker-compose.yml,server.py}`, scripts `/usr/local/sbin/homelab-*`, unités `systemd/homelab-*`, `51homelab-unattended` | Copie directe |
 
 ---

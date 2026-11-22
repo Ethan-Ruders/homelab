@@ -33,9 +33,10 @@ flowchart LR
 | Portail d'accueil | `homepage` | `homelab` | Page d'accueil centralisée & widgets en direct (Proxmox, AdGuard, Prometheus, Docker) | Actif |
 | Reverse Proxy | `nginx-proxy-manager` | `npm.homelab` | Terminaison TLS & routage HTTPS (`127.0.0.1:81` pour l'admin) | Actif |
 | DNS local | `adguard-home` | `adguard.homelab` | Résolution `*.homelab` et filtrage DNS (`:53`) | Actif |
-| Automatisation | `n8n` | `n8n.homelab` | Webhooks PowerTrack (`POST`/`GET`), surveillance services, alertes backup & veille hebdo vocale IA/Cyber/Tech (Gemini + Discord Audio) | Actif |
+| Automatisation | `n8n` | `n8n.homelab` | Webhooks PowerTrack (`POST`/`GET`), surveillance services, alertes backup, veille vocale & radar stages/alternance | Actif |
+| Radar Carrière | `homelab-carriere` | `carriere.homelab` | Interface web de suivi candidatures (offres, entreprises ≤ 30 min IGN) & export Excel (`.xlsx`) | Actif |
 | Synthèse vocale | `homelab-tts` | *(réseau interne `homelab-net`)* | Sidecar Python/FFmpeg de conversion PCM → OGG Opus & upload vocal Discord pour `n8n` (contient aussi Piper local optionnel) | Actif |
-| Base de données | `postgres-force` | *(réseau interne `homelab-net`)* | PostgreSQL 15 (`powertrack`, `db_entrainement`), non exposé hors Docker | Actif |
+| Base de données | `postgres-force` | *(réseau interne `homelab-net`)* | PostgreSQL 15 (`powertrack`, `carriere`, `db_entrainement`), non exposé hors Docker | Actif |
 | Visualisation | `grafana` | `grafana.homelab` | Dashboards système Linux (`Node Exporter`) & conteneurs (`cAdvisor`) | Actif |
 | Métriques | `prometheus` / `node-exporter` / `cadvisor` | `prometheus.homelab` | Collecte métriques hôte et conteneurs Docker | Actif |
 | Forge Git | `gitea` | `gitea.homelab` | Dépôts Git locaux (SSH sur port `222`) | Actif |
@@ -56,7 +57,8 @@ flowchart LR
 | [`stacks/carnet-force/init-powertrack.sql`](stacks/carnet-force/init-powertrack.sql) | `/home/ethan/carnet-force/init-powertrack.sql` | Schéma SQL, fonctions d'upsert, alertes et vues PowerTrack |
 | [`stacks/monitoring/`](stacks/monitoring/docker-compose.yml) | `/home/ethan/monitoring/` | Prometheus, Grafana, Node Exporter et cAdvisor |
 | [`stacks/n8n/docker-compose.yml`](stacks/n8n/docker-compose.yml) | `/home/ethan/n8n-docker/docker-compose.yml` | Service `n8n` derrière `https://n8n.homelab/` |
-| [`stacks/n8n/workflows/`](stacks/n8n/workflows/powertrack-post.json) | Base `n8n` (exports nettoyés) | Workflows PowerTrack, alertes Discord et veille vocale IA/Cyber/Tech |
+| [`stacks/n8n/workflows/`](stacks/n8n/workflows/powertrack-post.json) | Base `n8n` (exports nettoyés) | Workflows PowerTrack, alertes Discord, veille vocale & radar stages/alternance |
+| [`stacks/carriere/`](stacks/carriere/docker-compose.yml) | `/home/ethan/carriere-docker/` | App web FastAPI `homelab-carriere` (`carriere.homelab`), collecteurs d'offres/entreprises & export Excel |
 | [`stacks/tts/`](stacks/tts/docker-compose.yml) | `/home/ethan/tts-docker/` | Sidecar `homelab-tts` (conversion PCM → OGG Opus, waveform & upload Discord) |
 | [`stacks/gitea/docker-compose.yml`](stacks/gitea/docker-compose.yml) | `/home/ethan/gitea-docker/docker-compose.yml` | Forge Gitea interne |
 | [`stacks/homepage/`](stacks/homepage/docker-compose.yml) | `/home/ethan/homepage-docker/` | Page d'accueil Homepage, `.env.example` et fichiers YAML |

@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Homelab Career Radar — Stages &amp; Alternance</title>
+  <style>
+    :root {
+      --bg: #0b1120;
+      --surface: #111827;
+      --surface2: #1e293b;
+      --border: #283548;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent2: #6366f1;
+      --green: #22c55e;
+      --amber: #f59e0b;
+      --red: #ef4444;
+      --purple: #a855f7;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.45;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      background: rgba(15, 23, 42, 0.94);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 24px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand h1 { margin: 0; font-size: 1.15rem; font-weight: 700; letter-spacing: -0.01em; }
+    .brand span { font-size: 0.78rem; color: var(--muted); }
+    .nav-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .tabs { display: flex; gap: 6px; background: var(--surface); padding: 4px; border-radius: 10px; border: 1px solid var(--border); }
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      padding: 7px 14px;
+      border-radius: 7px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .tab-btn.active { background: var(--accent2); color: #fff; }
+    .btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 13px;
+      border-radius: 8px;
+      font-size: 0.86rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn:hover { border-color: var(--accent); }
+    .btn-primary { background: #0284c7; border-color: #0ea5e9; color: #fff; }
+    .btn-success { background: #15803d; border-color: #22c55e; color: #fff; }
+    .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+    main { max-width: 1520px; margin: 0 auto; padding: 20px 24px 60px; }
+    .panel { display: none; }
+    .panel.active { display: block; }
+    .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .card h3 { margin: 0 0 8px; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+    .kpi-val { font-size: 1.85rem; font-weight: 800; }
+    .kpi-sub { font-size: 0.82rem; color: var(--muted); margin-top: 4px; }
+    .filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      align-items: center;
+    }
+    .filters input, .filters select {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 7px 10px;
+      font-size: 0.87rem;
+    }
+    .filters input[type="search"] { flex: 1; min-width: 220px; }
+    .table-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow-x: auto;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 0.87rem; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+    th { background: var(--surface2); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); white-space: nowrap; }
+    tr:hover td { background: rgba(30, 41, 59, 0.45); }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.74rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .b-stage { background: rgba(56, 189, 248, 0.16); color: #7dd3fc; border: 1px solid rgba(56, 189, 248, 0.35); }
+    .b-alt { background: rgba(99, 102, 241, 0.18); color: #a5b4fc; border: 1px solid rgba(99, 102, 241, 0.4); }
+    .b-lba { background: rgba(34, 197, 94, 0.16); color: #86efac; border: 1px solid rgba(34, 197, 94, 0.35); }
+    .b-zone { background: rgba(148, 163, 184, 0.15); color: #cbd5e1; }
+    .b-score-hi { background: rgba(34, 197, 94, 0.2); color: #86efac; }
+    .b-score-mid { background: rgba(245, 158, 11, 0.2); color: #fcd34d; }
+    .b-score-lo { background: rgba(148, 163, 184, 0.15); color: #94a3b8; }
+    select.status-sel {
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 5px 8px;
+      font-size: 0.82rem;
+      font-weight: 600;
+    }
+    .muted { color: var(--muted); font-size: 0.81rem; }
+    .desc-snippet { max-width: 380px; font-size: 0.82rem; color: #cbd5e1; }
+    .toast {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      background: #1e293b;
+      border: 1px solid var(--accent);
+      color: var(--text);
+      padding: 10px 16px;
+      border-radius: 10px;
+      font-size: 0.87rem;
+      z-index: 60;
+      display: none;
+    }
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(2, 6, 23, 0.72);
+      z-index: 50;
+      display: none;
+      justify-content: flex-end;
+    }
+    .modal-backdrop.open { display: flex; }
+    .drawer {
+      width: min(560px, 100vw);
+      background: var(--surface);
+      border-left: 1px solid var(--border);
+      padding: 22px;
+      overflow-y: auto;
+      height: 100%;
+    }
+    .drawer h2 { margin: 0 0 6px; font-size: 1.15rem; }
+    .field { margin-top: 12px; }
+    .field label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 4px; font-weight: 600; }
+    .field input, .field select, .field textarea {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 0.88rem;
+      font-family: inherit;
+    }
+    .field textarea { min-height: 92px; resize: vertical; }
+    .raw-box {
+      margin-top: 12px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 0.8rem;
+      max-height: 220px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      color: #cbd5e1;
+    }
+    .row-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  </style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div>
+      <h1>Homelab Career Radar</h1>
+      <span>1A Ingé · Stage Été 2027 &amp; Alternance 2 ans (Sept. 2027) · Loperhet / Lannion / Caen</span>
+    </div>
+  </div>
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="dashboard">Tableau de bord</button>
+    <button class="tab-btn" data-tab="offres">Offres (<span id="tab-count-offres">0</span>)</button>
+    <button class="tab-btn" data-tab="entreprises">Entreprises (<span id="tab-count-ent">0</span>)</button>
+  </div>
+  <div class="nav-actions">
+    <button class="btn btn-primary" id="btn-collect">Lancer collecte offres</button>
+    <a class="btn btn-success" href="/api/export.xlsx">Télécharger Excel (.xlsx)</a>
+  </div>
+</header>
+
+<main>
+  <section id="panel-dashboard" class="panel active">
+    <div class="grid" id="kpi-cards"></div>
+    <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));">
+      <div class="card">
+        <h3>Entreprises par zone (&le; 30 min voiture IGN)</h3>
+        <div class="table-wrap" style="border:none;">
+          <table>
+            <thead>
+              <tr><th>Zone</th><th>Total</th><th>&le;20m</th><th>20-30m</th><th>Grands/ETI</th><th>LBA</th><th>Suivies</th></tr>
+            </thead>
+            <tbody id="zone-summary-body"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Relances &agrave; faire (&ge; 10 jours sans r&eacute;ponse)</h3>
+        <div id="relances-box" class="muted">Chargement...</div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Dernière exécution du collecteur</h3>
+      <div id="last-collect-box" class="muted">Chargement...</div>
+    </div>
+  </section>
+
+  <section id="panel-offres" class="panel">
+    <div class="filters">
+      <input type="search" id="f-offres-q" placeholder="Rechercher poste, entreprise, ville, compétence..." />
+      <select id="f-offres-zone">
+        <option value="">Toutes zones</option>
+        <option value="loperhet">Loperhet / Brest</option>
+        <option value="lannion">Lannion</option>
+        <option value="caen">Caen</option>
+      </select>
+      <select id="f-offres-contrat">
+        <option value="">Stage + Alternance</option>
+        <option value="stage">Stage été</option>
+        <option value="alternance">Alternance 2 ans</option>
+      </select>
+      <select id="f-offres-statut">
+        <option value="">Tous statuts</option>
+        <option value="À voir">À voir</option>
+        <option value="À postuler">À postuler</option>
+        <option value="Postulée">Postulée</option>
+        <option value="Relancée">Relancée</option>
+        <option value="Entretien">Entretien</option>
+        <option value="En attente">En attente</option>
+        <option value="Accepté">Accepté</option>
+        <option value="Refusée">Refusée</option>
+        <option value="Ignorée">Ignorée</option>
+      </select>
+      <select id="f-offres-score">
+        <option value="">Tout score</option>
+        <option value="70">Score &ge; 70</option>
+        <option value="55">Score &ge; 55</option>
+      </select>
+      <button class="btn" id="btn-new-offer">+ Ajouter une offre</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Score</th>
+            <th>Contrat</th>
+            <th>Poste &amp; Résumé IA</th>
+            <th>Entreprise &amp; Activité</th>
+            <th>Zone / Trajet</th>
+            <th>Statut</th>
+            <th>Suivi</th>
+            <th>Lien direct</th>
+          </tr>
+        </thead>
+        <tbody id="offres-tbody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="panel-entreprises" class="panel">
+    <div class="filters">
+      <input type="search" id="f-ent-q" placeholder="Rechercher entreprise, ville, secteur, activité..." />
+      <select id="f-ent-zone">
+        <option value="">Toutes zones</option>
+        <option value="loperhet">Loperhet / Brest</option>
+        <option value="lannion">Lannion</option>
+        <option value="caen">Caen</option>
+      </select>
+      <select id="f-ent-trajet">
+        <option value="">&le; 30 min</option>
+        <option value="<=20min">&le; 20 min</option>
+        <option value="20-30min">20–30 min</option>
+      </select>
+      <select id="f-ent-taille">
+        <option value="">Toutes tailles (&ge;10)</option>
+        <option value="Grand groupe">Grand groupe</option>
+        <option value="ETI">ETI</option>
+        <option value="PME">PME</option>
+        <option value="Petite entreprise">Petite entreprise</option>
+      </select>
+      <select id="f-ent-lba">
+        <option value="">Potentiel LBA : Tous</option>
+        <option value="true">Potentiel Alternance LBA</option>
+      </select>
+      <select id="f-ent-statut">
+        <option value="">Tous statuts</option>
+        <option value="Non contactée">Non contactée</option>
+        <option value="À contacter">À contacter</option>
+        <option value="Contactée">Contactée</option>
+        <option value="Relancée">Relancée</option>
+        <option value="Entretien">Entretien</option>
+        <option value="En attente">En attente</option>
+        <option value="Refus">Refus</option>
+        <option value="Écartée">Écartée</option>
+      </select>
+      <button class="btn" id="btn-new-company">+ Ajouter entreprise</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Priorité</th>
+            <th>Entreprise &amp; Taille</th>
+            <th>Activité / Ce qu'elle fait</th>
+            <th>Zone / Trajet</th>
+            <th>Liens &amp; Offres</th>
+            <th>Statut</th>
+            <th>Contact / Date</th>
+            <th>Éditer</th>
+          </tr>
+        </thead>
+        <tbody id="ent-tbody"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<div class="modal-backdrop" id="drawer-bg">
+  <div class="drawer" id="drawer-content"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const OFFER_STATUTS = ["À voir", "À postuler", "Postulée", "Relancée", "Entretien", "En attente", "Accepté", "Refusée", "Ignorée"];
+const ENT_STATUTS = ["Non contactée", "À contacter", "Contactée", "Relancée", "Entretien", "En attente", "Refus", "Écartée"];
+const ZONE_LABELS = { loperhet: "Loperhet / Brest", lannion: "Lannion", caen: "Caen" };
+
+let offersCache = [];
+let companiesCache = [];
+
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+}
+
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.style.display = "block";
+  clearTimeout(showToast._tid);
+  showToast._tid = setTimeout(() => { t.style.display = "none"; }, 3500);
+}
+
+async function api(url, opts = {}) {
+  const res = await fetch(url, {
+    headers: { "Content-Type": "application/json", ...(opts.headers || {}) },
+    ...opts,
+  });
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(`HTTP ${res.status}: ${txt.slice(0, 200)}`);
+  }
+  return res.json();
+}
+
+function statusOptions(list, cur) {
+  return list.map(s => `<option value="${esc(s)}"${s === cur ? " selected" : ""}>${esc(s)}</option>`).join("");
+}
+
+function scoreBadge(score) {
+  if (score === null || score === undefined) return `<span class="badge b-score-lo">À scorer</span>`;
+  const cls = score >= 75 ? "b-score-hi" : score >= 55 ? "b-score-mid" : "b-score-lo";
+  return `<span class="badge ${cls}">${score}/100</span>`;
+}
+
+async function loadStats() {
+  const st = await api("/api/stats");
+  const totalOffres = st.offres_par_statut.reduce((a, b) => a + b.total, 0);
+  const byStat = Object.fromEntries(st.offres_par_statut.map(x => [x.statut, x.total]));
+  const totalEnt = st.entreprises_par_zone.reduce((a, b) => a + b.total, 0);
+  const grandsEnt = st.entreprises_par_zone.reduce((a, b) => a + b.grands_acteurs, 0);
+
+  document.getElementById("kpi-cards").innerHTML = `
+    <div class="card"><h3>Offres collectées</h3><div class="kpi-val">${totalOffres}</div><div class="kpi-sub">À voir : ${byStat["À voir"] || 0} · À postuler : ${byStat["À postuler"] || 0}</div></div>
+    <div class="card"><h3>Candidatures actives</h3><div class="kpi-val">${(byStat["Postulée"] || 0) + (byStat["Relancée"] || 0) + (byStat["En attente"] || 0)}</div><div class="kpi-sub">Entretiens : ${byStat["Entretien"] || 0} · Acceptées : ${byStat["Accepté"] || 0}</div></div>
+    <div class="card"><h3>Entreprises (&le; 30 min)</h3><div class="kpi-val">${totalEnt}</div><div class="kpi-sub">Grands groupes &amp; ETI : ${grandsEnt}</div></div>
+    <div class="card"><h3>Relances &ge; 10j</h3><div class="kpi-val" style="color:${st.relances.length ? '#f59e0b' : '#22c55e'}">${st.relances.length}</div><div class="kpi-sub">Candidatures sans réponse &gt; 10 jours</div></div>
+  `;
+
+  document.getElementById("zone-summary-body").innerHTML = st.entreprises_par_zone.map(z => `
+    <tr>
+      <td><strong>${esc(ZONE_LABELS[z.zone] || z.zone)}</strong></td>
+      <td>${z.total}</td>
+      <td>${z.sous_20min}</td>
+      <td>${z.entre_20_30min}</td>
+      <td>${z.grands_acteurs}</td>
+      <td>${z.lba_potentiel}</td>
+      <td>${z.suivies}</td>
+    </tr>
+  `).join("") || `<tr><td colspan="7" class="muted">Aucune entreprise chargée</td></tr>`;
+
+  if (!st.relances.length) {
+    document.getElementById("relances-box").innerHTML = `<span class="muted">Aucune relance urgente pour le moment.</span>`;
+  } else {
+    document.getElementById("relances-box").innerHTML = st.relances.map(r => `
+      <div style="padding:6px 0; border-bottom:1px solid var(--border);">
+        <strong>[${esc(r.entite_type)}] ${esc(r.nom)}</strong> — ${esc(r.detail)} <span class="muted">(${esc(r.zone)}, action ${esc(r.date_action)})</span>
+      </div>
+    `).join("");
+  }
+
+  const lc = st.derniere_collecte;
+  document.getElementById("last-collect-box").innerHTML = lc
+    ? `ID #${lc.id} · Type : <strong>${esc(lc.type)}</strong> · Statut : <strong>${esc(lc.status)}</strong> · ${esc(lc.finished_at || lc.started_at)}<pre class="raw-box" style="margin-top:8px;">${esc(JSON.stringify(lc.summary || {}, null, 2))}</pre>`
+    : "Aucune collecte enregistrée.";
+}
+
+async function loadOffres() {
+  const params = new URLSearchParams();
+  const q = document.getElementById("f-offres-q").value.trim();
+  const zone = document.getElementById("f-offres-zone").value;
+  const contrat = document.getElementById("f-offres-contrat").value;
+  const statut = document.getElementById("f-offres-statut").value;
+  const scoreMin = document.getElementById("f-offres-score").value;
+  if (q) params.set("q", q);
+  if (zone) params.set("zone", zone);
+  if (contrat) params.set("type_contrat", contrat);
+  if (statut) params.set("statut", statut);
+  if (scoreMin) params.set("score_min", scoreMin);
+
+  offersCache = await api(`/api/offres?${params.toString()}`);
+  document.getElementById("tab-count-offres").textContent = offersCache.length;
+
+  document.getElementById("offres-tbody").innerHTML = offersCache.map(o => `
+    <tr>
+      <td>${scoreBadge(o.score_ia)}<div class="muted" style="margin-top:4px;">${esc(o.domaine_ia || o.source)}</div></td>
+      <td><span class="badge ${o.type_contrat === 'stage' ? 'b-stage' : 'b-alt'}">${o.type_contrat === 'stage' ? 'STAGE ÉTÉ' : 'ALTERNANCE'}</span></td>
+      <td>
+        <strong>${esc(o.titre)}</strong>
+        <div class="desc-snippet">${esc(o.resume_ia || (o.description ? o.description.slice(0, 180) + "..." : ""))}</div>
+      </td>
+      <td>
+        <strong>${esc(o.entreprise_nom)}</strong> ${o.taille_categorie ? `<span class="badge b-zone">${esc(o.taille_categorie)}</span>` : ""}
+        <div class="desc-snippet muted">${esc(o.entreprise_resume || "")}</div>
+      </td>
+      <td>
+        <div>${esc(ZONE_LABELS[o.zone] || o.zone)}</div>
+        <div class="muted">${esc(o.ville || "")} ${o.trajet_tranche ? "· " + esc(o.trajet_tranche) : ""}</div>
+      </td>
+      <td>
+        <select class="status-sel" onchange="quickOfferStatus(${o.id}, this.value)">
+          ${statusOptions(OFFER_STATUTS, o.statut)}
+        </select>
+      </td>
+      <td class="muted">
+        ${o.date_candidature ? `Cand: ${esc(o.date_candidature)}<br>` : ""}
+        ${o.notes ? esc(o.notes.slice(0, 60)) : ""}
+      </td>
+      <td>
+        <div class="row-actions">
+          <a class="btn" href="${esc(o.url_directe)}" target="_blank" rel="noopener">Ouvrir ↗</a>
+          <button class="btn" onclick="openOfferDrawer(${o.id})">Fiche</button>
+        </div>
+      </td>
+    </tr>
+  `).join("") || `<tr><td colspan="8" class="muted">Aucune offre correspondante.</td></tr>`;
+}
+
+async function loadEntreprises() {
+  const params = new URLSearchParams();
+  const q = document.getElementById("f-ent-q").value.trim();
+  const zone = document.getElementById("f-ent-zone").value;
+  const trajet = document.getElementById("f-ent-trajet").value;
+  const taille = document.getElementById("f-ent-taille").value;
+  const lba = document.getElementById("f-ent-lba").value;
+  const statut = document.getElementById("f-ent-statut").value;
+  if (q) params.set("q", q);
+  if (zone) params.set("zone", zone);
+  if (trajet) params.set("trajet_tranche", trajet);
+  if (taille) params.set("taille_categorie", taille);
+  if (lba) params.set("lba_potentiel", lba);
+  if (statut) params.set("statut", statut);
+
+  companiesCache = await api(`/api/entreprises?${params.toString()}`);
+  document.getElementById("tab-count-ent").textContent = companiesCache.length;
+
+  document.getElementById("ent-tbody").innerHTML = companiesCache.map(e => `
+    <tr>
+      <td><span class="badge ${e.priorite === 1 ? 'b-score-hi' : e.priorite === 2 ? 'b-score-mid' : 'b-score-lo'}">P${e.priorite}</span></td>
+      <td>
+        <strong>${esc(e.nom)}</strong>
+        <div class="muted">${esc(e.taille_categorie || "")} · ${esc(e.effectif_label || "")}</div>
+        ${e.lba_potentiel ? `<span class="badge b-lba" style="margin-top:4px;">Potentiel Alternance LBA</span>` : ""}
+      </td>
+      <td>
+        <div class="desc-snippet">${esc(e.description || e.libelle_naf || "")}</div>
+        <div class="muted" style="margin-top:4px;">NAF ${esc(e.code_naf || "")} · ${(e.domaine_tags || []).map(esc).join(", ")}</div>
+      </td>
+      <td>
+        <div>${esc(ZONE_LABELS[e.zone] || e.zone)}</div>
+        <div class="muted">${esc(e.ville || "")} (${esc(e.code_postal || "")})</div>
+        <div class="muted">${esc(e.trajet_tranche || "")} ${e.distance_km ? `· ${e.distance_km} km` : ""}</div>
+      </td>
+      <td>
+        <div class="row-actions">
+          ${e.url_carrieres ? `<a href="${esc(e.url_carrieres)}" target="_blank" rel="noopener">Carrières ↗</a>` : ""}
+          ${e.site_web ? `<a href="${esc(e.site_web)}" target="_blank" rel="noopener">Site ↗</a>` : ""}
+          ${e.url_lba ? `<a href="${esc(e.url_lba)}" target="_blank" rel="noopener">LBA ↗</a>` : ""}
+          ${e.nb_offres ? `<span class="badge b-alt">${e.nb_offres} offre(s)</span>` : ""}
+        </div>
+      </td>
+      <td>
+        <select class="status-sel" onchange="quickCompanyStatus(${e.id}, this.value)">
+          ${statusOptions(ENT_STATUTS, e.statut)}
+        </select>
+      </td>
+      <td class="muted">
+        ${esc(e.contact_nom || "")}<br>${esc(e.contact_email || "")}<br>${esc(e.date_contact || "")}
+      </td>
+      <td><button class="btn" onclick="openCompanyDrawer(${e.id})">Fiche</button></td>
+    </tr>
+  `).join("") || `<tr><td colspan="8" class="muted">Aucune entreprise trouvée.</td></tr>`;
+}
+
+async function quickOfferStatus(id, statut) {
+  const payload = { statut };
+  if (["Postulée", "Contactée"].includes(statut)) {
+    payload.date_candidature = new Date().toISOString().slice(0, 10);
+  }
+  await api(`/api/offres/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
+  showToast(`Offre #${id} → ${statut}`);
+  loadStats();
+}
+
+async function quickCompanyStatus(id, statut) {
+  const payload = { statut };
+  if (statut === "Contactée") {
+    payload.date_contact = new Date().toISOString().slice(0, 10);
+  }
+  await api(`/api/entreprises/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
+  showToast(`Entreprise #${id} → ${statut}`);
+  loadStats();
+}
+
+function closeDrawer() {
+  document.getElementById("drawer-bg").classList.remove("open");
+}
+
+function openOfferDrawer(id) {
+  const o = offersCache.find(x => x.id === id);
+  if (!o) return;
+  document.getElementById("drawer-content").innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <h2>${esc(o.titre)}</h2>
+      <button class="btn" onclick="closeDrawer()">Fermer</button>
+    </div>
+    <div class="muted">${esc(o.entreprise_nom)} · ${esc(o.ville || "")} (${esc(o.zone)}) · <a href="${esc(o.url_directe)}" target="_blank" rel="noopener">Ouvrir l'annonce ↗</a></div>
+    <div class="field"><label>Ce que fait l'entreprise</label><textarea id="d-o-eresume">${esc(o.entreprise_resume || "")}</textarea></div>
+    <div class="field"><label>Résumé IA</label><textarea id="d-o-resume">${esc(o.resume_ia || "")}</textarea></div>
+    <div class="field"><label>Statut</label><select id="d-o-statut">${statusOptions(OFFER_STATUTS, o.statut)}</select></div>
+    <div class="field"><label>Date de candidature</label><input type="date" id="d-o-dcand" value="${esc(o.date_candidature || "")}" /></div>
+    <div class="field"><label>Date de dernière relance</label><input type="date" id="d-o-drel" value="${esc(o.date_relance || "")}" /></div>
+    <div class="field"><label>Contact (nom / email / LinkedIn)</label><input type="text" id="d-o-contact" value="${esc(o.contact_info || "")}" /></div>
+    <div class="field"><label>Notes personnelles / Préparation entretien</label><textarea id="d-o-notes">${esc(o.notes || "")}</textarea></div>
+    <div style="margin-top:14px; display:flex; gap:8px;">
+      <button class="btn btn-primary" onclick="saveOfferDrawer(${o.id})">Enregistrer</button>
+    </div>
+    <div class="field"><label>Description brute de l'offre</label><div class="raw-box">${esc(o.description || "Aucune description disponible.")}</div></div>
+  `;
+  document.getElementById("drawer-bg").classList.add("open");
+}
+
+async function saveOfferDrawer(id) {
+  const payload = {
+    entreprise_resume: document.getElementById("d-o-eresume").value,
+    resume_ia: document.getElementById("d-o-resume").value,
+    statut: document.getElementById("d-o-statut").value,
+    date_candidature: document.getElementById("d-o-dcand").value || null,
+    date_relance: document.getElementById("d-o-drel").value || null,
+    contact_info: document.getElementById("d-o-contact").value,
+    notes: document.getElementById("d-o-notes").value,
+  };
+  await api(`/api/offres/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
+  closeDrawer();
+  showToast("Fiche offre enregistrée");
+  await Promise.all([loadOffres(), loadStats()]);
+}
+
+function openCompanyDrawer(id) {
+  const e = companiesCache.find(x => x.id === id);
+  if (!e) return;
+  document.getElementById("drawer-content").innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <h2>${esc(e.nom)}</h2>
+      <button class="btn" onclick="closeDrawer()">Fermer</button>
+    </div>
+    <div class="muted">${esc(e.adresse || e.ville || "")} · ${esc(e.trajet_tranche || "")} · SIRET ${esc(e.siret || "N/A")}</div>
+    <div class="field"><label>Activité / Ce qu'il faut savoir avant de contacter</label><textarea id="d-e-desc">${esc(e.description || "")}</textarea></div>
+    <div class="field"><label>Statut candidature spontanée</label><select id="d-e-statut">${statusOptions(ENT_STATUTS, e.statut)}</select></div>
+    <div class="field"><label>Priorité (1 = Top, 2 = Moyen, 3 = Secondaire)</label><input type="number" min="1" max="3" id="d-e-prio" value="${e.priorite || 2}" /></div>
+    <div class="field"><label>Nom du contact / Recruteur</label><input type="text" id="d-e-cnom" value="${esc(e.contact_nom || "")}" /></div>
+    <div class="field"><label>Email / LinkedIn contact</label><input type="text" id="d-e-cmail" value="${esc(e.contact_email || "")}" /></div>
+    <div class="field"><label>Date de premier contact</label><input type="date" id="d-e-dcon" value="${esc(e.date_contact || "")}" /></div>
+    <div class="field"><label>Date de relance</label><input type="date" id="d-e-drel" value="${esc(e.date_relance || "")}" /></div>
+    <div class="field"><label>Site web</label><input type="text" id="d-e-site" value="${esc(e.site_web || "")}" /></div>
+    <div class="field"><label>Page carrières</label><input type="text" id="d-e-car" value="${esc(e.url_carrieres || "")}" /></div>
+    <div class="field"><label>Notes personnelles</label><textarea id="d-e-notes">${esc(e.notes || "")}</textarea></div>
+    <div style="margin-top:14px;"><button class="btn btn-primary" onclick="saveCompanyDrawer(${e.id})">Enregistrer</button></div>
+  `;
+  document.getElementById("drawer-bg").classList.add("open");
+}
+
+async function saveCompanyDrawer(id) {
+  const payload = {
+    description: document.getElementById("d-e-desc").value,
+    statut: document.getElementById("d-e-statut").value,
+    priorite: Number(document.getElementById("d-e-prio").value) || 2,
+    contact_nom: document.getElementById("d-e-cnom").value,
+    contact_email: document.getElementById("d-e-cmail").value,
+    date_contact: document.getElementById("d-e-dcon").value || null,
+    date_relance: document.getElementById("d-e-drel").value || null,
+    site_web: document.getElementById("d-e-site").value,
+    url_carrieres: document.getElementById("d-e-car").value,
+    notes: document.getElementById("d-e-notes").value,
+  };
+  await api(`/api/entreprises/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
+  closeDrawer();
+  showToast("Fiche entreprise enregistrée");
+  await Promise.all([loadEntreprises(), loadStats()]);
+}
+
+function openNewOfferModal() {
+  document.getElementById("drawer-content").innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <h2>Ajouter une offre manuellement</h2>
+      <button class="btn" onclick="closeDrawer()">Fermer</button>
+    </div>
+    <div class="field"><label>Entreprise *</label><input id="n-o-ent" /></div>
+    <div class="field"><label>Titre du poste *</label><input id="n-o-tit" /></div>
+    <div class="field"><label>Type</label><select id="n-o-type"><option value="alternance">Alternance (2 ans)</option><option value="stage">Stage (été)</option></select></div>
+    <div class="field"><label>Zone</label><select id="n-o-zone"><option value="loperhet">Loperhet / Brest</option><option value="lannion">Lannion</option><option value="caen">Caen</option></select></div>
+    <div class="field"><label>Ville</label><input id="n-o-ville" /></div>
+    <div class="field"><label>Lien direct vers l'offre *</label><input id="n-o-url" placeholder="https://..." /></div>
+    <div class="field"><label>Activité entreprise (anti-trou de mémoire)</label><textarea id="n-o-eresume"></textarea></div>
+    <div class="field"><label>Statut</label><select id="n-o-stat">${statusOptions(OFFER_STATUTS, "À postuler")}</select></div>
+    <div class="field"><label>Notes</label><textarea id="n-o-notes"></textarea></div>
+    <div style="margin-top:14px;"><button class="btn btn-primary" onclick="submitNewOffer()">Créer</button></div>
+  `;
+  document.getElementById("drawer-bg").classList.add("open");
+}
+
+async function submitNewOffer() {
+  const payload = {
+    entreprise_nom: document.getElementById("n-o-ent").value,
+    titre: document.getElementById("n-o-tit").value,
+    type_contrat: document.getElementById("n-o-type").value,
+    zone: document.getElementById("n-o-zone").value,
+    ville: document.getElementById("n-o-ville").value,
+    url_directe: document.getElementById("n-o-url").value,
+    entreprise_resume: document.getElementById("n-o-eresume").value,
+    statut: document.getElementById("n-o-stat").value,
+    notes: document.getElementById("n-o-notes").value,
+  };
+  await api("/api/offres", { method: "POST", body: JSON.stringify(payload) });
+  closeDrawer();
+  showToast("Offre ajoutée");
+  await Promise.all([loadOffres(), loadStats()]);
+}
+
+function openNewCompanyModal() {
+  document.getElementById("drawer-content").innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <h2>Ajouter une entreprise</h2>
+      <button class="btn" onclick="closeDrawer()">Fermer</button>
+    </div>
+    <div class="field"><label>Nom *</label><input id="n-e-nom" /></div>
+    <div class="field"><label>Zone</label><select id="n-e-zone"><option value="loperhet">Loperhet / Brest</option><option value="lannion">Lannion</option><option value="caen">Caen</option></select></div>
+    <div class="field"><label>Ville</label><input id="n-e-ville" /></div>
+    <div class="field"><label>Temps de trajet</label><select id="n-e-trj"><option value="<=20min">&le; 20 min</option><option value="20-30min">20-30 min</option></select></div>
+    <div class="field"><label>Taille</label><select id="n-e-tai"><option value="Grand groupe">Grand groupe</option><option value="ETI">ETI</option><option value="PME">PME</option></select></div>
+    <div class="field"><label>Activité / Ce qu'elle fait</label><textarea id="n-e-desc"></textarea></div>
+    <div class="field"><label>Site web</label><input id="n-e-site" /></div>
+    <div class="field"><label>Page carrières</label><input id="n-e-car" /></div>
+    <div class="field"><label>Notes</label><textarea id="n-e-notes"></textarea></div>
+    <div style="margin-top:14px;"><button class="btn btn-primary" onclick="submitNewCompany()">Créer</button></div>
+  `;
+  document.getElementById("drawer-bg").classList.add("open");
+}
+
+async function submitNewCompany() {
+  const payload = {
+    nom: document.getElementById("n-e-nom").value,
+    zone: document.getElementById("n-e-zone").value,
+    ville: document.getElementById("n-e-ville").value,
+    trajet_tranche: document.getElementById("n-e-trj").value,
+    taille_categorie: document.getElementById("n-e-tai").value,
+    description: document.getElementById("n-e-desc").value,
+    site_web: document.getElementById("n-e-site").value,
+    url_carrieres: document.getElementById("n-e-car").value,
+    notes: document.getElementById("n-e-notes").value,
+  };
+  await api("/api/entreprises", { method: "POST", body: JSON.stringify(payload) });
+  closeDrawer();
+  showToast("Entreprise ajoutée");
+  await Promise.all([loadEntreprises(), loadStats()]);
+}
+
+document.querySelectorAll(".tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById(`panel-${btn.dataset.tab}`).classList.add("active");
+  });
+});
+
+document.getElementById("drawer-bg").addEventListener("click", e => {
+  if (e.target.id === "drawer-bg") closeDrawer();
+});
+
+["f-offres-q", "f-offres-zone", "f-offres-contrat", "f-offres-statut", "f-offres-score"].forEach(id => {
+  document.getElementById(id).addEventListener("input", () => loadOffres());
+  document.getElementById(id).addEventListener("change", () => loadOffres());
+});
+["f-ent-q", "f-ent-zone", "f-ent-trajet", "f-ent-taille", "f-ent-lba", "f-ent-statut"].forEach(id => {
+  document.getElementById(id).addEventListener("input", () => loadEntreprises());
+  document.getElementById(id).addEventListener("change", () => loadEntreprises());
+});
+
+document.getElementById("btn-new-offer").addEventListener("click", openNewOfferModal);
+document.getElementById("btn-new-company").addEventListener("click", openNewCompanyModal);
+
+document.getElementById("btn-collect").addEventListener("click", async () => {
+  const btn = document.getElementById("btn-collect");
+  btn.disabled = true;
+  btn.textContent = "Collecte en cours...";
+  try {
+    const res = await api("/api/ui/collect-offers", { method: "POST" });
+    showToast(`Collecte terminée (${res.run_summary.total_upserted || 0} offres traitées)`);
+    await Promise.all([loadStats(), loadOffres(), loadEntreprises()]);
+  } catch (err) {
+    showToast("Erreur collecte : " + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Lancer collecte offres";
+  }
+});
+
+Promise.all([loadStats(), loadOffres(), loadEntreprises()]).catch(err => showToast(err.message));
+</script>
+</body>
+</html>

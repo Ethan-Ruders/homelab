@@ -22,7 +22,8 @@ mkdir -p \
     "$STAGE/gitea" \
     "$STAGE/homepage" \
     "$STAGE/adguard" \
-    "$STAGE/tts"
+    "$STAGE/tts" \
+    "$STAGE/carriere"
 
 backup_sqlite() {
     local src_path="$1"
@@ -46,6 +47,8 @@ PY
 docker exec postgres-force pg_dump -U ethan -Fc powertrack > "$STAGE/postgres/powertrack.dump"
 docker exec postgres-force pg_dump -U ethan --no-owner powertrack > "$STAGE/postgres/powertrack.sql"
 docker exec postgres-force pg_dump -U ethan -Fc db_entrainement > "$STAGE/postgres/db_entrainement.dump"
+docker exec postgres-force pg_dump -U ethan -Fc carriere > "$STAGE/postgres/carriere.dump"
+docker exec postgres-force pg_dump -U ethan --no-owner carriere > "$STAGE/postgres/carriere.sql"
 
 # 2. n8n SQLite DB, encryption config, and workflow JSON export
 N8N_DATA="/var/lib/docker/volumes/n8n-docker_n8n_data/_data"
@@ -111,6 +114,12 @@ fi
 for tts_file in Dockerfile docker-compose.yml server.py; do
     if [ -f "/home/ethan/tts-docker/$tts_file" ]; then
         cp -a "/home/ethan/tts-docker/$tts_file" "$STAGE/tts/$tts_file"
+    fi
+done
+
+for car_item in Dockerfile docker-compose.yml .env init-carriere.sql app; do
+    if [ -e "/home/ethan/carriere-docker/$car_item" ]; then
+        cp -a "/home/ethan/carriere-docker/$car_item" "$STAGE/carriere/$car_item"
     fi
 done
 
