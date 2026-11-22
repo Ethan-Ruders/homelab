@@ -1,5 +1,5 @@
 {
-  "name": "Homelab - Veille Hebdo IA & Cyber (Discord)",
+  "name": "Homelab - Veille Hebdo IA, Cyber & Tech (Discord)",
   "active": true,
   "nodes": [
     {
@@ -43,7 +43,7 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "const decodeEntities = (str) =>\n  String(str || '')\n    .replace(/<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>/g, '$1')\n    .replace(/<[^>]+>/g, ' ')\n    .replace(/&amp;/g, '&')\n    .replace(/&lt;/g, '<')\n    .replace(/&gt;/g, '>')\n    .replace(/&quot;/g, '\"')\n    .replace(/&#039;|&#39;|&apos;/g, \"'\")\n    .replace(/&#(\\d+);/g, (_, n) => String.fromCharCode(Number(n)))\n    .replace(/\\s+/g, ' ')\n    .trim();\n\nconst extractTag = (block, tags) => {\n  for (const tag of tags) {\n    const m = block.match(new RegExp(`<${tag}(?:\\\\s[^>]*)?>([\\\\s\\\\S]*?)<\\\\/${tag}>`, 'i'));\n    if (m && m[1]) return decodeEntities(m[1]);\n  }\n  return '';\n};\n\nconst extractLink = (block) => {\n  const atomAlt = block.match(/<link[^>]+rel=[\"']alternate[\"'][^>]+href=[\"']([^\"']+)[\"']/i)\n    || block.match(/<link[^>]+href=[\"']([^\"']+)[\"'][^>]+rel=[\"']alternate[\"']/i)\n    || block.match(/<link[^>]+href=[\"']([^\"']+)[\"']/i);\n  if (atomAlt && atomAlt[1]) return decodeEntities(atomAlt[1]);\n  return extractTag(block, ['link']);\n};\n\nconst parseFeed = (xml, sourceName) => {\n  const entries = [];\n  const blocks = [\n    ...(String(xml || '').match(/<item\\b[\\s\\S]*?<\\/item>/gi) || []),\n    ...(String(xml || '').match(/<entry\\b[\\s\\S]*?<\\/entry>/gi) || []),\n  ];\n  for (const b of blocks) {\n    const title = extractTag(b, ['title']);\n    const url = extractLink(b);\n    const dateStr = extractTag(b, ['pubDate', 'published', 'updated', 'dc:date']);\n    const ts = dateStr ? Date.parse(dateStr) : 0;\n    if (title && url && url.startsWith('http')) {\n      entries.push({\n        source: sourceName,\n        title: title.length > 130 ? `${title.slice(0, 127)}…` : title,\n        url,\n        ts: Number.isFinite(ts) ? ts : 0,\n      });\n    }\n  }\n  return entries;\n};\n\nconst formatDigest = (header, items, errors) => {\n  const now = Date.now();\n  const cutoff = now - 7 * 24 * 3600 * 1000;\n  const seen = new Set();\n  const deduped = [];\n  for (const it of items.sort((a, b) => b.ts - a.ts)) {\n    if (seen.has(it.url)) continue;\n    seen.add(it.url);\n    deduped.push(it);\n  }\n  let pool = deduped.filter((x) => x.ts >= cutoff);\n  if (pool.length < 3) {\n    pool = deduped;\n  }\n\n  // Diversifier les sources : max 2 articles par source en 1ère passe, puis compléter jusqu'à 6\n  const picked = [];\n  const perSource = {};\n  for (const it of pool) {\n    if (picked.length >= 6) break;\n    const c = perSource[it.source] || 0;\n    if (c < 2) {\n      picked.push(it);\n      perSource[it.source] = c + 1;\n    }\n  }\n  for (const it of pool) {\n    if (picked.length >= 6) break;\n    if (!picked.includes(it)) picked.push(it);\n  }\n\n  const lines = [header];\n  if (picked.length === 0) {\n    lines.push('Aucun nouvel article récupéré cette semaine.');\n  } else {\n    for (const it of picked) {\n      const d = it.ts ? new Date(it.ts).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) : '--/--';\n      const entry = `• **[${it.source} · ${d}]** ${it.title}\\n  <${it.url}>`;\n      if ([...lines, entry].join('\\n').length <= 1850) {\n        lines.push(entry);\n      }\n    }\n  }\n  if (errors.length > 0 && lines.join('\\n').length < 1750) {\n    lines.push(`\\n_Sources injoignables : ${errors.join(', ')}_`);\n  }\n  return lines.join('\\n').slice(0, 1950);\n};\n\nconst categories = [\n  {\n    header: '🤖 **Veille Hebdo — Intelligence Artificielle**',\n    feeds: [\n      { source: 'Hugging Face', url: 'https://huggingface.co/blog/feed.xml' },\n      { source: 'OpenAI', url: 'https://openai.com/news/rss.xml' },\n      { source: 'DeepMind', url: 'https://deepmind.google/blog/rss.xml' },\n      { source: 'Simon Willison', url: 'https://simonwillison.net/atom/everything/' },\n    ],\n  },\n  {\n    header: '🛡️ **Veille Hebdo — Cybersécurité & CERT-FR**',\n    feeds: [\n      { source: 'CERT-FR', url: 'https://www.cert.ssi.gouv.fr/feed/' },\n      { source: 'The Hacker News', url: 'https://feeds.feedburner.com/TheHackersNews' },\n      { source: 'BleepingComputer', url: 'https://www.bleepingcomputer.com/feed/' },\n    ],\n  },\n];\n\nconst out = [];\nfor (const cat of categories) {\n  const items = [];\n  const errors = [];\n  for (const feed of cat.feeds) {\n    try {\n      const xml = await this.helpers.httpRequest({\n        method: 'GET',\n        url: feed.url,\n        timeout: 10000,\n        headers: {\n          'User-Agent': 'Homelab-Veille-Bot/1.0',\n          Accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml',\n        },\n      });\n      items.push(...parseFeed(typeof xml === 'string' ? xml : JSON.stringify(xml), feed.source));\n    } catch (_) {\n      errors.push(feed.source);\n    }\n  }\n  out.push({ json: { message: formatDigest(cat.header, items, errors) } });\n}\n\nreturn out;\n"
+        "jsCode": "const decodeEntities = (str) =>\n  String(str || '')\n    .replace(/<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>/g, '$1')\n    .replace(/<[^>]+>/g, ' ')\n    .replace(/https?:\\/\\/\\S+/gi, '')\n    .replace(/\\bwww\\.\\S+/gi, '')\n    .replace(/&nbsp;/gi, ' ')\n    .replace(/&amp;/gi, '&')\n    .replace(/&lt;/gi, '<')\n    .replace(/&gt;/gi, '>')\n    .replace(/&quot;|&ldquo;|&rdquo;/gi, '\"')\n    .replace(/&#0?39;|&apos;|&rsquo;|&lsquo;/gi, \"'\")\n    .replace(/&mdash;|&ndash;/gi, '—')\n    .replace(/&hellip;/gi, '…')\n    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCharCode(parseInt(h, 16)))\n    .replace(/&#(\\d+);/g, (_, n) => String.fromCharCode(Number(n)))\n    .replace(/\\s+/g, ' ')\n    .trim();\n\nconst extractTag = (block, tags) => {\n  for (const tag of tags) {\n    const escaped = tag.replace(':', '\\\\:');\n    const m = block.match(new RegExp(`<${escaped}(?:\\\\s[^>]*)?>([\\\\s\\\\S]*?)<\\\\/${escaped}>`, 'i'));\n    if (m && m[1]) {\n      const cleaned = decodeEntities(m[1]);\n      if (cleaned) return cleaned;\n    }\n  }\n  return '';\n};\n\nconst extractLink = (block) => {\n  const atomAlt = block.match(/<link[^>]+rel=[\"']alternate[\"'][^>]+href=[\"']([^\"']+)[\"']/i)\n    || block.match(/<link[^>]+href=[\"']([^\"']+)[\"'][^>]+rel=[\"']alternate[\"']/i)\n    || block.match(/<link[^>]+href=[\"']([^\"']+)[\"']/i);\n  if (atomAlt && atomAlt[1]) return atomAlt[1].trim();\n  return extractTag(block, ['link']);\n};\n\nconst parseFeed = (xml, sourceName) => {\n  const entries = [];\n  const blocks = [\n    ...(String(xml || '').match(/<item\\b[\\s\\S]*?<\\/item>/gi) || []),\n    ...(String(xml || '').match(/<entry\\b[\\s\\S]*?<\\/entry>/gi) || []),\n  ];\n  for (const b of blocks) {\n    const title = extractTag(b, ['title']);\n    const url = extractLink(b);\n    const dateStr = extractTag(b, ['pubDate', 'published', 'updated', 'dc:date']);\n    const summary = extractTag(b, ['description', 'summary', 'content:encoded', 'content']).slice(0, 420);\n    const ts = dateStr ? Date.parse(dateStr) : 0;\n    if (title) {\n      entries.push({\n        source: sourceName,\n        title: title.length > 160 ? `${title.slice(0, 157)}…` : title,\n        url: url || title,\n        summary,\n        ts: Number.isFinite(ts) ? ts : 0,\n      });\n    }\n  }\n  return entries;\n};\n\nconst pickCategoryItems = (items) => {\n  const now = Date.now();\n  const cutoff = now - 7 * 24 * 3600 * 1000;\n  const seen = new Set();\n  const deduped = [];\n  for (const it of items.sort((a, b) => b.ts - a.ts)) {\n    const key = it.title.toLowerCase().replace(/[^a-z0-9à-ÿ]+/gi, ' ').trim();\n    if (!key || seen.has(key) || seen.has(it.url)) continue;\n    seen.add(key);\n    seen.add(it.url);\n    deduped.push(it);\n  }\n  let pool = deduped.filter((x) => x.ts >= cutoff);\n  if (pool.length < 4) pool = deduped;\n\n  const picked = [];\n  const perSource = {};\n  for (const it of pool) {\n    if (picked.length >= 8) break;\n    const c = perSource[it.source] || 0;\n    if (c < 3) {\n      picked.push(it);\n      perSource[it.source] = c + 1;\n    }\n  }\n  for (const it of pool) {\n    if (picked.length >= 8) break;\n    if (!picked.includes(it)) picked.push(it);\n  }\n  return picked;\n};\n\nconst categories = [\n  {\n    key: 'ia',\n    label: 'INTELLIGENCE ARTIFICIELLE',\n    feeds: [\n      { source: 'Hugging Face', url: 'https://huggingface.co/blog/feed.xml' },\n      { source: 'OpenAI', url: 'https://openai.com/news/rss.xml' },\n      { source: 'DeepMind', url: 'https://deepmind.google/blog/rss.xml' },\n      { source: 'Simon Willison', url: 'https://simonwillison.net/atom/everything/' },\n    ],\n  },\n  {\n    key: 'cyber',\n    label: 'CYBERSÉCURITÉ & CERT-FR',\n    feeds: [\n      { source: 'CERT-FR', url: 'https://www.cert.ssi.gouv.fr/feed/' },\n      { source: 'The Hacker News', url: 'https://feeds.feedburner.com/TheHackersNews' },\n      { source: 'BleepingComputer', url: 'https://www.bleepingcomputer.com/feed/' },\n    ],\n  },\n  {\n    key: 'tech',\n    label: 'TECH EN GÉNÉRAL',\n    feeds: [\n      { source: 'Ars Technica', url: 'https://feeds.arstechnica.com/arstechnica/technology-lab' },\n      { source: 'The Verge', url: 'https://www.theverge.com/rss/index.xml' },\n      { source: 'TechCrunch', url: 'https://techcrunch.com/feed/' },\n      { source: 'Korben', url: 'https://korben.info/feed' },\n    ],\n  },\n];\n\nconst sections = [];\nconst counts = {};\nconst feedErrors = [];\n\nfor (const cat of categories) {\n  const rawItems = [];\n  for (const feed of cat.feeds) {\n    try {\n      const xml = await this.helpers.httpRequest({\n        method: 'GET',\n        url: feed.url,\n        timeout: 10000,\n        headers: {\n          'User-Agent': 'Homelab-Veille-Bot/2.0',\n          Accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml',\n        },\n      });\n      rawItems.push(...parseFeed(typeof xml === 'string' ? xml : JSON.stringify(xml), feed.source));\n    } catch (_) {\n      feedErrors.push(feed.source);\n    }\n  }\n  const picked = pickCategoryItems(rawItems);\n  counts[cat.key] = picked.length;\n  const blockLines = [`=== ${cat.label} ===`];\n  for (const it of picked) {\n    const d = it.ts ? new Date(it.ts).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) : '--/--';\n    blockLines.push(`- [${it.source} | ${d}] ${it.title}`);\n    if (it.summary) blockLines.push(`  Extrait : ${it.summary}`);\n  }\n  sections.push(blockLines.join('\\n'));\n}\n\nconst dateLabel = new Date().toLocaleDateString('fr-FR', {\n  timeZone: 'Europe/Paris',\n  day: '2-digit',\n  month: '2-digit',\n  year: 'numeric',\n});\n\nconst prompt = [\n  'Tu es un rédacteur tech francophone expert. Rédige une veille hebdomadaire complète, claire et autonome en français pour Discord à partir uniquement des articles ci-dessous.',\n  '',\n  'Règles strictes :',\n  '1. Retourne UNIQUEMENT un objet JSON valide avec exactement les clés \"ia\", \"cyber\" et \"tech\".',\n  '2. Pour CHAQUE clé (\"ia\", \"cyber\", \"tech\"), synthétise 4 à 5 actualités majeures distinctes et informatives.',\n  '3. Format OBLIGATOIRE de chaque puce :',\n  '• **Titre court et précis** — Explication claire et autonome en 2 à 3 phrases expliquant concrètement les faits, les nouveautés techniques et leur impact. *(Nom de la source)*',\n  '4. INTERDICTION ABSOLUE d\\'inclure la moindre URL, http://, https://, www. ou lien cliquable. Le lecteur veut tout comprendre directement en lisant Discord sans ouvrir aucun lien.',\n  '5. Longueur de chaque champ (\"ia\", \"cyber\", \"tech\") : entre 900 et 1 550 caractères (IMPÉRATIF : strictement inférieur à 1 750 caractères par champ).',\n  '6. Ne rien inventer en dehors des extraits fournis ci-dessous.',\n  '',\n  sections.join('\\n\\n'),\n].join('\\n');\n\nconst geminiBody = {\n  contents: [{ role: 'user', parts: [{ text: prompt }] }],\n  generationConfig: {\n    responseMimeType: 'application/json',\n    temperature: 0.4,\n    maxOutputTokens: 8192,\n    thinkingConfig: { thinkingBudget: 256 },\n  },\n};\n\nreturn [{ json: { dateLabel, counts, feedErrors, geminiBody } }];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -52,7 +52,53 @@
         0
       ],
       "id": "hl-veille-fetch",
-      "name": "Fetch & Format Digests"
+      "name": "Collecter Sources RSS"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.geminiBody) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        0
+      ],
+      "id": "hl-veille-gemini",
+      "name": "Synthèse Gemini",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 4000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "hlGeminiApiKey01",
+          "name": "Veille Gemini API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const resp = $input.first()?.json || {};\nlet dateLabel = '';\ntry {\n  dateLabel = $('Collecter Sources RSS').first()?.json?.dateLabel || '';\n} catch (_) {}\nif (!dateLabel) {\n  dateLabel = new Date().toLocaleDateString('fr-FR', {\n    timeZone: 'Europe/Paris',\n    day: '2-digit',\n    month: '2-digit',\n    year: 'numeric',\n  });\n}\n\nconst parts = resp?.candidates?.[0]?.content?.parts || [];\nconst rawText = parts\n  .filter((p) => !p.thought && typeof p.text === 'string')\n  .map((p) => p.text)\n  .join('')\n  .trim();\n\nif (!rawText) {\n  throw new Error('Réponse Gemini vide : ' + JSON.stringify(resp).slice(0, 400));\n}\n\nconst jsonStr = rawText\n  .replace(/^```(?:json)?\\s*/i, '')\n  .replace(/\\s*```$/i, '')\n  .trim();\n\nconst parsed = JSON.parse(jsonStr);\n\nconst sanitizeSection = (txt, header) => {\n  let clean = String(txt || 'Aucun élément marquant cette semaine.')\n    .replace(/\\[([^\\]]+)\\]\\((?:https?:\\/\\/|www\\.)[^)]+\\)/gi, '$1')\n    .replace(/<?https?:\\/\\/[^\\s>]+>?/gi, '')\n    .replace(/\\bwww\\.[^\\s>]+/gi, '')\n    .replace(/[ \\t]+\\n/g, '\\n')\n    .replace(/\\n{3,}/g, '\\n\\n')\n    .trim();\n\n  const maxBody = 1950 - header.length;\n  if (clean.length > maxBody) {\n    let cut = clean.slice(0, maxBody - 1);\n    const lastNl = cut.lastIndexOf('\\n•');\n    if (lastNl > 400) {\n      cut = cut.slice(0, lastNl).trim();\n    } else {\n      const lastDot = cut.lastIndexOf('.');\n      if (lastDot > 400) cut = cut.slice(0, lastDot + 1).trim();\n    }\n    clean = cut;\n  }\n  return header + clean;\n};\n\nreturn [\n  {\n    json: {\n      category: 'ia',\n      message: sanitizeSection(\n        parsed.ia,\n        `🤖 **Veille Hebdo — Intelligence Artificielle** *(${dateLabel})*\\n\\n`,\n      ),\n    },\n  },\n  {\n    json: {\n      category: 'cyber',\n      message: sanitizeSection(\n        parsed.cyber,\n        `🛡️ **Veille Hebdo — Cybersécurité & CERT-FR** *(${dateLabel})*\\n\\n`,\n      ),\n    },\n  },\n  {\n    json: {\n      category: 'tech',\n      message: sanitizeSection(\n        parsed.tech,\n        `💻 **Veille Hebdo — Tech & Innovation** *(${dateLabel})*\\n\\n`,\n      ),\n    },\n  },\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        780,
+        0
+      ],
+      "id": "hl-veille-format",
+      "name": "Formater Messages Discord"
     },
     {
       "parameters": {
@@ -77,7 +123,7 @@
       "type": "n8n-nodes-base.discord",
       "typeVersion": 2,
       "position": [
-        520,
+        1040,
         0
       ],
       "id": "hl-veille-discord",
@@ -95,7 +141,7 @@
       "main": [
         [
           {
-            "node": "Fetch & Format Digests",
+            "node": "Collecter Sources RSS",
             "type": "main",
             "index": 0
           }
@@ -106,14 +152,36 @@
       "main": [
         [
           {
-            "node": "Fetch & Format Digests",
+            "node": "Collecter Sources RSS",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Fetch & Format Digests": {
+    "Collecter Sources RSS": {
+      "main": [
+        [
+          {
+            "node": "Synthèse Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Synthèse Gemini": {
+      "main": [
+        [
+          {
+            "node": "Formater Messages Discord",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formater Messages Discord": {
       "main": [
         [
           {
