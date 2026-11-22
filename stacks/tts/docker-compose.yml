@@ -1,0 +1,12 @@
+services:
+  homelab-tts:
+    build: .
+    image: homelab-tts:local
+    container_name: homelab-tts
+    restart: unless-stopped
+    networks:
+      - homelab-net
+
+networks:
+  homelab-net:
+    external: true

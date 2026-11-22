@@ -21,7 +21,8 @@ mkdir -p \
     "$STAGE/monitoring" \
     "$STAGE/gitea" \
     "$STAGE/homepage" \
-    "$STAGE/adguard"
+    "$STAGE/adguard" \
+    "$STAGE/tts"
 
 backup_sqlite() {
     local src_path="$1"
@@ -106,6 +107,12 @@ fi
 if [ -d "/home/ethan/homepage-docker/config" ]; then
     cp -a "/home/ethan/homepage-docker/config" "$STAGE/homepage/config"
 fi
+
+for tts_file in Dockerfile docker-compose.yml server.py; do
+    if [ -f "/home/ethan/tts-docker/$tts_file" ]; then
+        cp -a "/home/ethan/tts-docker/$tts_file" "$STAGE/tts/$tts_file"
+    fi
+done
 
 if [ -f "/usr/local/sbin/homelab-health-alert.sh" ]; then
     cp -a "/usr/local/sbin/homelab-health-alert.sh" "$STAGE/configs/homelab-health-alert.sh"
