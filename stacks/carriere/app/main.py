@@ -237,6 +237,8 @@ def list_offres(
     if statut:
         where.append("o.statut = %s")
         params.append(statut)
+    else:
+        where.append("o.statut NOT IN ('Ignorée', 'Ignoré')")
     if score_min is not None:
         where.append("COALESCE(o.score_ia, 0) >= %s")
         params.append(score_min)
@@ -434,6 +436,7 @@ def export_excel():
             SELECT o.*, COALESCE(NULLIF(o.entreprise_resume, ''), e.description, '') AS entreprise_resume
             FROM offres o
             LEFT JOIN entreprises e ON e.id = o.entreprise_id
+            WHERE o.statut NOT IN ('Ignorée', 'Ignoré')
             ORDER BY COALESCE(o.score_ia, 50) DESC, o.id DESC
             """
         )

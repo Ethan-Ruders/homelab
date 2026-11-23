@@ -43,18 +43,36 @@ ZONE_CITIES: dict[str, tuple[str, ...]] = {
     ),
 }
 
-IT_RELEVANCE_KEYWORDS = (
-    "INFORMATIQUE", "CYBER", "SECURITE", "SECURITY", "SOC", "PENTEST", "DEVSECOPS",
-    "INTELLIGENCE ARTIFICIELLE", " IA ", " AI ", "MACHINE LEARNING", "DEEP LEARNING", "DATA",
-    "SYSTEME", "SYSTEM", "RESEAU", "NETWORK", "LINUX", "CLOUD", "DEVOPS", "INFRASTRUCTURE",
-    "DEVELOPP", "SOFTWARE", "LOGICIEL", "PYTHON", "FULLSTACK", "BACKEND", "WEB", "API",
-    "ADMIN", "VIRTUALISATION", "TELECOM", "5G", "INGENIEUR", "TECH", "SI ", "S.I.",
+IT_RELEVANCE_RE = re.compile(
+    r"(?:"
+    r"\b(?:CYBER\w*|PENTEST\w*|SOC|SIEM|DEVSECOPS|SECOPS|RSSI|CRYPTOGRAPH\w*|"
+    r"INFORMATIQUE\w*|LOGICIEL\w*|SOFTWARE|FULL\s*-?\s*STACK|BACK\s*-?\s*END|FRONT\s*-?\s*END|"
+    r"DEVOPS|SRE|SYSADMIN|CLOUD|KUBERNETES|DOCKER|LINUX|PYTHON|GOLANG|RUST|JAVA|TYPESCRIPT|"
+    r"SQL|POSTGRESQL|TELECOM\w*|5G|VIRTUALISATION|VMWARE|PROXMOX|PARE\s*-?\s*FEU|FIREWALL|"
+    r"IA|GENAI|LLMS?|NLP|BIG\s+DATA|MACHINE\s+LEARNING|DEEP\s+LEARNING|INTELLIGENCE\s+ARTIFICIELLE|"
+    r"API\s+REST)\b|"
+    r"\bDEVELOPP(?:EUR|EUSE)\b|"
+    r"\bDEVELOPPEMENT\s+(?:WEB|LOGICIEL|INFORMATIQUE|APPLICATIF|FULL\s*-?\s*STACK|BACK\s*-?\s*END|FRONT\s*-?\s*END|PYTHON|JAVA|RUST)\b|"
+    r"\bADMINISTRATEUR\s+(?:SYSTEMES?|RESEAUX?|LINUX|CLOUD|BASES?\s+DE\s+DONNEES?|SECURITE)\b|"
+    r"\bINGENIEUR\s+(?:INFORMATIQUE|LOGICIEL|SYSTEMES?|RESEAUX?|CLOUD|CYBER\w*|IA|DATA|DEVOPS|SECURITE\s+INFORMATIQUE|TELECOM\w*)\b|"
+    r"\bRESEAUX?\s+(?:INFORMATIQUE|IP|TELECOM\w*|SECURIS\w*)\b|"
+    r"\bSYSTEMES?\s+(?:ET\s+RESEAUX?|D\s*'?INFORMATION|LINUX|CLOUD|DISTRIBUES?|SECURISES?)\b|"
+    r"\bDATA\s+(?:SCIENTIST|ENGINEER|ANALYST|IA)\b|"
+    r"\bAI\s+(?:ENGINEER|RESEARCH|AGENT|SECURITY|MODEL)\b|"
+    r"(?<!\w)C\+\+(?!\w)"
+    r")"
 )
 
 OFFER_EXCLUDE_KEYWORDS = (
     "BOULANGER", "CUISIN", "CHAUFFEUR", "PLOMBIER", "MENUIS", "COIFFEUR",
     "CARISTE", "MAGASINIER", "VENDEUR", "CAISSIER", "MACON", "PEINTRE",
     "ASSISTANTE MATERNELLE", "SOIGNANT", "INFIRMIER", "SERVEUR RESTAURANT",
+    "DENTAIRE", "OPTICIEN", "CRECHE", "AUXILIAIRE DE", "RESTAURATION",
+    "HOTELLERIE", "EQUIPIER POLYVALENT", "EQUIPER POLYVALENT", "CONSEILLER DE VENTE",
+    "PROSPECTION COMMERCIAL", "DEVELOPPEMENT COMMERCIAL", "CONTROLEUR DE GESTION",
+    "COMPTABLE", "ASSISTANT ADV", "FROID INDUSTRIEL", "MONTEUR ELECTRICIEN",
+    "GENIE CIVIL", "ENROBES", "LEASING AUTOMOBILE", "CHARGE DE COMMUNICATION",
+    "CHARPENTE",
 )
 
 
@@ -111,7 +129,7 @@ def _is_relevant_domain(title: str, desc: str) -> bool:
     t = _norm(f"{title} {desc[:600]}")
     if any(bad in t for bad in OFFER_EXCLUDE_KEYWORDS):
         return False
-    return any(kw in t for kw in IT_RELEVANCE_KEYWORDS)
+    return bool(IT_RELEVANCE_RE.search(t))
 
 
 def _match_company(cur, siret: str | None, name: str) -> tuple[int | None, str | None, str | None]:
@@ -463,7 +481,7 @@ def _collect_adzuna(client: httpx.Client, zones: dict[str, dict[str, Any]]) -> l
     out: list[dict[str, Any]] = []
     seen_ids: set[str] = set()
     city_map = {"loperhet": "Brest", "lannion": "Lannion", "caen": "Caen"}
-    what_or = "cybersecurite cyber securite ia data reseau systeme informatique linux cloud devops developpeur ingenieur"
+    what_or = "cybersecurite cyber informatique linux cloud devops python data ia reseaux systemes developpeur logiciel"
     for zcode, city in city_map.items():
         for contract_kw in ("stage", "alternance"):
             resp = client.get(
@@ -472,6 +490,7 @@ def _collect_adzuna(client: httpx.Client, zones: dict[str, dict[str, Any]]) -> l
                     "app_id": app_id,
                     "app_key": app_key,
                     "results_per_page": 50,
+                    "category": "it-jobs",
                     "what": contract_kw,
                     "what_or": what_or,
                     "where": city,

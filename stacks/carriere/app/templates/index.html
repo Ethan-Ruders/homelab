@@ -264,7 +264,7 @@
         <option value="alternance">Alternance 2 ans</option>
       </select>
       <select id="f-offres-statut">
-        <option value="">Tous statuts</option>
+        <option value="">Actives (hors ignorées)</option>
         <option value="À voir">À voir</option>
         <option value="À postuler">À postuler</option>
         <option value="Postulée">Postulée</option>
@@ -408,13 +408,14 @@ function scoreBadge(score) {
 
 async function loadStats() {
   const st = await api("/api/stats");
-  const totalOffres = st.offres_par_statut.reduce((a, b) => a + b.total, 0);
   const byStat = Object.fromEntries(st.offres_par_statut.map(x => [x.statut, x.total]));
+  const ignoredCount = (byStat["Ignorée"] || 0) + (byStat["Ignoré"] || 0);
+  const totalOffres = st.offres_par_statut.reduce((a, b) => a + b.total, 0) - ignoredCount;
   const totalEnt = st.entreprises_par_zone.reduce((a, b) => a + b.total, 0);
   const grandsEnt = st.entreprises_par_zone.reduce((a, b) => a + b.grands_acteurs, 0);
 
   document.getElementById("kpi-cards").innerHTML = `
-    <div class="card"><h3>Offres collectées</h3><div class="kpi-val">${totalOffres}</div><div class="kpi-sub">À voir : ${byStat["À voir"] || 0} · À postuler : ${byStat["À postuler"] || 0}</div></div>
+    <div class="card"><h3>Offres actives</h3><div class="kpi-val">${totalOffres}</div><div class="kpi-sub">À voir : ${byStat["À voir"] || 0} · À postuler : ${byStat["À postuler"] || 0} · Ignorées : ${ignoredCount}</div></div>
     <div class="card"><h3>Candidatures actives</h3><div class="kpi-val">${(byStat["Postulée"] || 0) + (byStat["Relancée"] || 0) + (byStat["En attente"] || 0)}</div><div class="kpi-sub">Entretiens : ${byStat["Entretien"] || 0} · Acceptées : ${byStat["Accepté"] || 0}</div></div>
     <div class="card"><h3>Entreprises (&le; 30 min)</h3><div class="kpi-val">${totalEnt}</div><div class="kpi-sub">Grands groupes &amp; ETI : ${grandsEnt}</div></div>
     <div class="card"><h3>Relances &ge; 10j</h3><div class="kpi-val" style="color:${st.relances.length ? '#f59e0b' : '#22c55e'}">${st.relances.length}</div><div class="kpi-sub">Candidatures sans réponse &gt; 10 jours</div></div>
