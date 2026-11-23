@@ -186,6 +186,10 @@
     .b-score-hi { background: rgba(34, 197, 94, 0.2); color: #86efac; }
     .b-score-mid { background: rgba(245, 158, 11, 0.2); color: #fcd34d; }
     .b-score-lo { background: rgba(148, 163, 184, 0.15); color: #94a3b8; }
+    .b-fit-ok { background: rgba(34, 197, 94, 0.16); color: #86efac; border: 1px solid rgba(34, 197, 94, 0.35); }
+    .b-fit-ko { background: rgba(239, 68, 68, 0.16); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.35); }
+    .stage-meta { display: flex; flex-direction: column; gap: 4px; margin-top: 5px; }
+    .field-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
     select.status-sel {
       background: var(--bg);
       color: var(--text);
@@ -282,7 +286,7 @@
   <div class="brand">
     <div>
       <h1>Homelab Career Radar</h1>
-      <span>1A Ingé · Stage Été 2027 &amp; Alternance 2 ans (Sept. 2027) · Loperhet / Lannion / Caen</span>
+      <span>1A Ingé · Stage Été 2027 (10–12 sem., &ge; 27 mai) &amp; Alternance 2 ans (Sept. 2027) · Loperhet / Lannion / Caen</span>
     </div>
   </div>
   <div class="tabs">
@@ -368,6 +372,12 @@
         <option value="70">Score &ge; 70</option>
         <option value="55">Score &ge; 55</option>
       </select>
+      <select id="f-offres-stage-fit" title="Filtrer les stages selon durée (10–12 sem.) et début (≥ 27 mai)">
+        <option value="">Stage : toutes durées / dates</option>
+        <option value="compatible">10–12 sem. &ge; 27 mai (+ N/C)</option>
+        <option value="duree_ok">10–12 sem. confirmé (&ge; 27 mai / N/C)</option>
+        <option value="strict">10–12 sem. &amp; &ge; 27 mai (strict)</option>
+      </select>
       <button class="btn" id="btn-new-offer">+ Ajouter une offre</button>
     </div>
     <div class="table-wrap">
@@ -415,6 +425,12 @@
         <option value="Accepté">Accepté</option>
         <option value="Refusée">Refusée</option>
         <option value="Ignorée">Ignorée</option>
+      </select>
+      <select id="f-sel-stage-fit" title="Filtrer les stages selon durée (10–12 sem.) et début (≥ 27 mai)">
+        <option value="">Stage : toutes durées / dates</option>
+        <option value="compatible">10–12 sem. &ge; 27 mai (+ N/C)</option>
+        <option value="duree_ok">10–12 sem. confirmé (&ge; 27 mai / N/C)</option>
+        <option value="strict">10–12 sem. &amp; &ge; 27 mai (strict)</option>
       </select>
       <span class="muted">Clique sur &#9734; / &#9733; dans <strong>Offres</strong> ou ici pour ajouter ou retirer une offre de ta sélection.</span>
     </div>
@@ -577,6 +593,14 @@ async function loadStats() {
   document.getElementById("sub-sel-stage").textContent = selStageCnt;
   document.getElementById("sub-sel-alt").textContent = selAltCnt;
 
+  const sf = st.stages_filtre || {};
+  const fitSel = document.getElementById("f-offres-stage-fit");
+  if (fitSel) {
+    fitSel.querySelector('option[value="compatible"]').textContent = `10–12 sem. ≥ 27 mai (+ N/C) (${sf.compatible ?? 0})`;
+    fitSel.querySelector('option[value="duree_ok"]').textContent = `10–12 sem. confirmé (≥ 27 mai / N/C) (${sf.duree_ok ?? 0})`;
+    fitSel.querySelector('option[value="strict"]').textContent = `10–12 sem. & ≥ 27 mai (strict) (${sf.strict ?? 0})`;
+  }
+
   document.getElementById("kpi-cards").innerHTML = `
     <div class="card"><h3>Offres actives</h3><div class="kpi-val">${totalOffres}</div><div class="kpi-sub"><a href="/offres/stages" onclick="event.preventDefault(); openOffersView('stage');">Stages : ${stageCnt}</a> · <a href="/offres/alternances" onclick="event.preventDefault(); openOffersView('alternance');">Alternances : ${altCnt}</a> · <a href="/selection" onclick="event.preventDefault(); openSelectionView('');">&#9733; ${selAllCnt}</a></div></div>
     <div class="card"><h3>Candidatures actives</h3><div class="kpi-val">${(byStat["Postulée"] || 0) + (byStat["Relancée"] || 0) + (byStat["En attente"] || 0)}</div><div class="kpi-sub">Entretiens : ${byStat["Entretien"] || 0} · Acceptées : ${byStat["Accepté"] || 0}</div></div>
@@ -612,6 +636,25 @@ async function loadStats() {
     : "Aucune collecte enregistrée.";
 }
 
+function renderStageTimingBadges(o) {
+  if (o.type_contrat !== "stage") return "";
+  const dmin = o.duree_semaines_min;
+  const dmax = o.duree_semaines_max ?? dmin;
+  let durBadge = `<span class="badge b-zone">⏱ Durée N/C</span>`;
+  if (dmin !== null && dmin !== undefined) {
+    const durOk = dmin <= 12 && dmax >= 10;
+    const durTxt = dmin === dmax ? `${dmin} sem.` : `${dmin}–${dmax} sem.`;
+    durBadge = `<span class="badge ${durOk ? "b-fit-ok" : "b-fit-ko"}">⏱ ${esc(durTxt)}</span>`;
+  }
+  let dateBadge = `<span class="badge b-zone">📅 Début N/C</span>`;
+  if (o.date_debut_stage) {
+    const dtOk = o.date_debut_stage >= "2027-05-27";
+    const [y, m, d] = o.date_debut_stage.split("-");
+    dateBadge = `<span class="badge ${dtOk ? "b-fit-ok" : "b-fit-ko"}">📅 dès ${esc(d)}/${esc(m)}/${esc(y)}</span>`;
+  }
+  return `<div class="stage-meta">${durBadge}${dateBadge}</div>`;
+}
+
 function renderOfferRow(o) {
   const starred = Boolean(o.is_starred);
   return `
@@ -622,7 +665,10 @@ function renderOfferRow(o) {
         </button>
       </td>
       <td>${scoreBadge(o.score_ia)}<div class="muted" style="margin-top:4px;">${esc(o.domaine_ia || o.source)}</div></td>
-      <td><span class="badge ${o.type_contrat === 'stage' ? 'b-stage' : 'b-alt'}">${o.type_contrat === 'stage' ? 'STAGE ÉTÉ' : 'ALTERNANCE'}</span></td>
+      <td>
+        <span class="badge ${o.type_contrat === 'stage' ? 'b-stage' : 'b-alt'}">${o.type_contrat === 'stage' ? 'STAGE ÉTÉ' : 'ALTERNANCE'}</span>
+        ${renderStageTimingBadges(o)}
+      </td>
       <td>
         <strong>${esc(o.titre)}</strong>
         <div class="desc-snippet">${esc(o.resume_ia || (o.description ? o.description.slice(0, 180) + "..." : ""))}</div>
@@ -661,11 +707,13 @@ async function loadOffres() {
   const contrat = currentOfferContract;
   const statut = document.getElementById("f-offres-statut").value;
   const scoreMin = document.getElementById("f-offres-score").value;
+  const stageFit = document.getElementById("f-offres-stage-fit").value;
   if (q) params.set("q", q);
   if (zone) params.set("zone", zone);
   if (contrat) params.set("type_contrat", contrat);
   if (statut) params.set("statut", statut);
   if (scoreMin) params.set("score_min", scoreMin);
+  if (stageFit && contrat !== "alternance") params.set("stage_filter", stageFit);
 
   offersCache = await api(`/api/offres?${params.toString()}`);
 
@@ -678,10 +726,12 @@ async function loadSelection() {
   const zone = document.getElementById("f-sel-zone").value;
   const contrat = currentSelContract;
   const statut = document.getElementById("f-sel-statut").value;
+  const stageFit = document.getElementById("f-sel-stage-fit").value;
   if (q) params.set("q", q);
   if (zone) params.set("zone", zone);
   if (contrat) params.set("type_contrat", contrat);
   if (statut) params.set("statut", statut);
+  if (stageFit && contrat !== "alternance") params.set("stage_filter", stageFit);
 
   starredCache = await api(`/api/offres?${params.toString()}`);
 
@@ -791,6 +841,12 @@ function openOfferDrawer(id) {
       <input type="checkbox" id="d-o-starred" style="width:auto;" ${o.is_starred ? "checked" : ""} />
       <label for="d-o-starred" style="margin:0; cursor:pointer; color:#facc15;">&#9733; Pointée dans ma sélection</label>
     </div>
+    ${o.type_contrat === "stage" ? `
+    <div class="field-grid-3">
+      <div class="field"><label>Durée min (sem.)</label><input type="number" min="1" max="60" id="d-o-dmin" value="${o.duree_semaines_min ?? ""}" placeholder="ex: 10" /></div>
+      <div class="field"><label>Durée max (sem.)</label><input type="number" min="1" max="60" id="d-o-dmax" value="${o.duree_semaines_max ?? ""}" placeholder="ex: 12" /></div>
+      <div class="field"><label>Date début stage</label><input type="date" id="d-o-dstart" value="${esc(o.date_debut_stage || "")}" /></div>
+    </div>` : ""}
     <div class="field"><label>Ce que fait l'entreprise</label><textarea id="d-o-eresume">${esc(o.entreprise_resume || "")}</textarea></div>
     <div class="field"><label>Résumé IA</label><textarea id="d-o-resume">${esc(o.resume_ia || "")}</textarea></div>
     <div class="field"><label>Statut</label><select id="d-o-statut">${statusOptions(OFFER_STATUTS, o.statut)}</select></div>
@@ -817,6 +873,14 @@ async function saveOfferDrawer(id) {
     contact_info: document.getElementById("d-o-contact").value,
     notes: document.getElementById("d-o-notes").value,
   };
+  const dminEl = document.getElementById("d-o-dmin");
+  if (dminEl) {
+    const dmaxEl = document.getElementById("d-o-dmax");
+    const dstartEl = document.getElementById("d-o-dstart");
+    payload.duree_semaines_min = dminEl.value ? Number(dminEl.value) : null;
+    payload.duree_semaines_max = dmaxEl.value ? Number(dmaxEl.value) : null;
+    payload.date_debut_stage = dstartEl.value || null;
+  }
   await api(`/api/offres/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
   closeDrawer();
   showToast("Fiche offre enregistrée");
@@ -874,7 +938,12 @@ function openNewOfferModal() {
     </div>
     <div class="field"><label>Entreprise *</label><input id="n-o-ent" /></div>
     <div class="field"><label>Titre du poste *</label><input id="n-o-tit" /></div>
-    <div class="field"><label>Type</label><select id="n-o-type"><option value="alternance">Alternance (2 ans)</option><option value="stage">Stage (été)</option></select></div>
+    <div class="field"><label>Type</label><select id="n-o-type" onchange="document.getElementById('n-o-stage-box').style.display = this.value === 'stage' ? 'grid' : 'none';"><option value="alternance">Alternance (2 ans)</option><option value="stage">Stage (été)</option></select></div>
+    <div class="field-grid-3" id="n-o-stage-box" style="display:none;">
+      <div class="field"><label>Durée min (sem.)</label><input type="number" min="1" max="60" id="n-o-dmin" placeholder="ex: 10" /></div>
+      <div class="field"><label>Durée max (sem.)</label><input type="number" min="1" max="60" id="n-o-dmax" placeholder="ex: 12" /></div>
+      <div class="field"><label>Date début stage</label><input type="date" id="n-o-dstart" /></div>
+    </div>
     <div class="field"><label>Zone</label><select id="n-o-zone"><option value="loperhet">Loperhet / Brest</option><option value="lannion">Lannion</option><option value="caen">Caen</option></select></div>
     <div class="field"><label>Ville</label><input id="n-o-ville" /></div>
     <div class="field"><label>Lien direct vers l'offre *</label><input id="n-o-url" placeholder="https://..." /></div>
@@ -887,10 +956,11 @@ function openNewOfferModal() {
 }
 
 async function submitNewOffer() {
+  const typeContrat = document.getElementById("n-o-type").value;
   const payload = {
     entreprise_nom: document.getElementById("n-o-ent").value,
     titre: document.getElementById("n-o-tit").value,
-    type_contrat: document.getElementById("n-o-type").value,
+    type_contrat: typeContrat,
     zone: document.getElementById("n-o-zone").value,
     ville: document.getElementById("n-o-ville").value,
     url_directe: document.getElementById("n-o-url").value,
@@ -898,6 +968,14 @@ async function submitNewOffer() {
     statut: document.getElementById("n-o-stat").value,
     notes: document.getElementById("n-o-notes").value,
   };
+  if (typeContrat === "stage") {
+    const dmin = document.getElementById("n-o-dmin").value;
+    const dmax = document.getElementById("n-o-dmax").value;
+    const dstart = document.getElementById("n-o-dstart").value;
+    if (dmin) payload.duree_semaines_min = Number(dmin);
+    if (dmax) payload.duree_semaines_max = Number(dmax);
+    if (dstart) payload.date_debut_stage = dstart;
+  }
   await api("/api/offres", { method: "POST", body: JSON.stringify(payload) });
   closeDrawer();
   showToast("Offre ajoutée");
@@ -967,9 +1045,21 @@ function switchTab(tabName, customPath = null) {
   }
 }
 
+function syncStageFilterVisibility(selectId, contract) {
+  const el = document.getElementById(selectId);
+  if (!el) return;
+  if (contract === "alternance") {
+    el.style.display = "none";
+    el.value = "";
+  } else {
+    el.style.display = "";
+  }
+}
+
 function openOffersView(contract) {
   currentOfferContract = contract || "";
   setActiveSubtab("offres-subtabs", currentOfferContract);
+  syncStageFilterVisibility("f-offres-stage-fit", currentOfferContract);
   const path = currentOfferContract === "stage" ? "/offres/stages" : currentOfferContract === "alternance" ? "/offres/alternances" : "/offres";
   switchTab("offres", path);
   loadOffres();
@@ -978,6 +1068,7 @@ function openOffersView(contract) {
 function openSelectionView(contract) {
   currentSelContract = contract || "";
   setActiveSubtab("selection-subtabs", currentSelContract);
+  syncStageFilterVisibility("f-sel-stage-fit", currentSelContract);
   const path = currentSelContract === "stage" ? "/selection/stages" : currentSelContract === "alternance" ? "/selection/alternances" : "/selection";
   switchTab("selection", path);
   loadSelection();
@@ -1006,11 +1097,11 @@ document.getElementById("drawer-bg").addEventListener("click", e => {
   if (e.target.id === "drawer-bg") closeDrawer();
 });
 
-["f-offres-q", "f-offres-zone", "f-offres-statut", "f-offres-score"].forEach(id => {
+["f-offres-q", "f-offres-zone", "f-offres-statut", "f-offres-score", "f-offres-stage-fit"].forEach(id => {
   document.getElementById(id).addEventListener("input", () => loadOffres());
   document.getElementById(id).addEventListener("change", () => loadOffres());
 });
-["f-sel-q", "f-sel-zone", "f-sel-statut"].forEach(id => {
+["f-sel-q", "f-sel-zone", "f-sel-statut", "f-sel-stage-fit"].forEach(id => {
   document.getElementById(id).addEventListener("input", () => loadSelection());
   document.getElementById(id).addEventListener("change", () => loadSelection());
 });
@@ -1046,6 +1137,7 @@ if (p === "/offres/stages") {
 } else if (p === "/offres/alternances") {
   currentOfferContract = "alternance";
   setActiveSubtab("offres-subtabs", "alternance");
+  syncStageFilterVisibility("f-offres-stage-fit", "alternance");
   switchTab("offres", p);
 } else if (p === "/offres") {
   switchTab("offres", p);
@@ -1056,6 +1148,7 @@ if (p === "/offres/stages") {
 } else if (p === "/selection/alternances") {
   currentSelContract = "alternance";
   setActiveSubtab("selection-subtabs", "alternance");
+  syncStageFilterVisibility("f-sel-stage-fit", "alternance");
   switchTab("selection", p);
 } else if (p === "/selection" || window.location.hash === "#selection") {
   switchTab("selection", "/selection");

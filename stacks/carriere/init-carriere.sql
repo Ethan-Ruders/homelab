@@ -63,6 +63,9 @@ CREATE TABLE IF NOT EXISTS offres (
     entreprise_resume TEXT,
     titre TEXT NOT NULL,
     type_contrat VARCHAR(20) NOT NULL,
+    duree_semaines_min SMALLINT,
+    duree_semaines_max SMALLINT,
+    date_debut_stage DATE,
     zone VARCHAR(20) NOT NULL,
     ville TEXT,
     trajet_tranche VARCHAR(20),
@@ -89,6 +92,7 @@ CREATE INDEX IF NOT EXISTS idx_offres_notified_at ON offres (notified_at);
 CREATE INDEX IF NOT EXISTS idx_offres_dedup_hash ON offres (dedup_hash);
 CREATE INDEX IF NOT EXISTS idx_offres_entreprise_id ON offres (entreprise_id);
 CREATE INDEX IF NOT EXISTS idx_offres_starred ON offres (is_starred) WHERE is_starred = TRUE;
+CREATE INDEX IF NOT EXISTS idx_offres_stage_timing ON offres (type_contrat, duree_semaines_min, duree_semaines_max, date_debut_stage);
 
 CREATE TABLE IF NOT EXISTS collectes (
     id SERIAL PRIMARY KEY,

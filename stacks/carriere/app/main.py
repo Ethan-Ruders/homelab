@@ -17,10 +17,14 @@ from starlette.requests import Request
 from .companies_sync import sync_all_companies
 from .db import db_cursor
 from .excel_export import build_workbook_bytes
-from .offers_collect import collect_all_offers
+from .offers_collect import collect_all_offers, extract_stage_timing
 
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+
+DEFAULT_STAGE_MIN_WEEKS = 10
+DEFAULT_STAGE_MAX_WEEKS = 12
+DEFAULT_STAGE_START_MIN = date(2027, 5, 27)
 
 app = FastAPI(title="Homelab Career Radar", version="1.0.0")
 
@@ -35,6 +39,9 @@ class OfferCreate(BaseModel):
     entreprise_nom: str = Field(..., min_length=1, max_length=200)
     titre: str = Field(..., min_length=1, max_length=300)
     type_contrat: str = Field(default="alternance")
+    duree_semaines_min: int | None = Field(default=None, ge=1, le=60)
+    duree_semaines_max: int | None = Field(default=None, ge=1, le=60)
+    date_debut_stage: date | None = None
     zone: str = Field(default="loperhet")
     ville: str | None = None
     url_directe: str = Field(..., min_length=4, max_length=1000)
@@ -57,6 +64,9 @@ class OfferPatch(BaseModel):
     resume_ia: str | None = None
     entreprise_resume: str | None = None
     is_starred: bool | None = None
+    duree_semaines_min: int | None = Field(default=None, ge=1, le=60)
+    duree_semaines_max: int | None = Field(default=None, ge=1, le=60)
+    date_debut_stage: date | None = None
 
 
 class CompanyCreate(BaseModel):
@@ -96,6 +106,9 @@ class ScoreItem(BaseModel):
     domaine_ia: str | None = None
     resume_ia: str | None = None
     entreprise_resume: str | None = None
+    duree_semaines_min: int | None = Field(default=None, ge=1, le=60)
+    duree_semaines_max: int | None = Field(default=None, ge=1, le=60)
+    date_debut_stage: date | None = None
 
 
 class ApplyScoresPayload(BaseModel):
@@ -158,6 +171,20 @@ def _serialize_dates(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             if hasattr(v, "isoformat"):
                 r[k] = v.isoformat()
     return rows
+
+
+def _stage_filter_clause(mode: str, alias: str = "o.") -> str:
+    """Return SQL predicate for stage duration/start-date matching."""
+    dur_overlap = (
+        f"{alias}duree_semaines_min IS NOT NULL AND {alias}duree_semaines_min <= %s "
+        f"AND COALESCE({alias}duree_semaines_max, {alias}duree_semaines_min) >= %s"
+    )
+    dur_compat = f"({alias}duree_semaines_min IS NULL OR ({dur_overlap}))"
+    if mode == "strict":
+        return f"{dur_overlap} AND {alias}date_debut_stage IS NOT NULL AND {alias}date_debut_stage >= %s"
+    if mode == "duree_ok":
+        return f"{dur_overlap} AND ({alias}date_debut_stage IS NULL OR {alias}date_debut_stage >= %s)"
+    return f"{dur_compat} AND ({alias}date_debut_stage IS NULL OR {alias}date_debut_stage >= %s)"
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -224,6 +251,30 @@ def get_stats():
         )
         offres_pointees = cur.fetchone()["cnt"]
 
+        stage_params = (
+            DEFAULT_STAGE_MAX_WEEKS, DEFAULT_STAGE_MIN_WEEKS, DEFAULT_STAGE_START_MIN,
+            DEFAULT_STAGE_MAX_WEEKS, DEFAULT_STAGE_MIN_WEEKS, DEFAULT_STAGE_START_MIN,
+            DEFAULT_STAGE_MAX_WEEKS, DEFAULT_STAGE_MIN_WEEKS, DEFAULT_STAGE_START_MIN,
+        )
+        cur.execute(
+            f"""
+            SELECT
+                COUNT(*) FILTER (WHERE {_stage_filter_clause('strict', '')})::int AS strict,
+                COUNT(*) FILTER (WHERE {_stage_filter_clause('duree_ok', '')})::int AS duree_ok,
+                COUNT(*) FILTER (WHERE {_stage_filter_clause('compatible', '')})::int AS compatible
+            FROM offres
+            WHERE type_contrat = 'stage'
+              AND statut NOT IN ('Ignorée', 'Ignoré')
+            """,
+            stage_params,
+        )
+        sf_row = cur.fetchone()
+        stages_filtre = {
+            "strict": sf_row["strict"],
+            "duree_ok": sf_row["duree_ok"],
+            "compatible": sf_row["compatible"],
+        }
+
         cur.execute("SELECT id, started_at, finished_at, type, status, summary FROM collectes ORDER BY id DESC LIMIT 1")
         row = cur.fetchone()
         last_collect = _serialize_dates([dict(row)])[0] if row else None
@@ -234,6 +285,7 @@ def get_stats():
         "offres_par_contrat": offres_contrat,
         "selection_par_contrat": selection_contrat,
         "offres_pointees": offres_pointees,
+        "stages_filtre": stages_filtre,
         "entreprises_par_zone": entreprises_zone,
         "relances": relances,
         "derniere_collecte": last_collect,
@@ -247,6 +299,10 @@ def list_offres(
     statut: str | None = Query(default=None),
     score_min: int | None = Query(default=None),
     starred: bool | None = Query(default=None),
+    stage_filter: str | None = Query(default=None),
+    duree_min: int = Query(default=DEFAULT_STAGE_MIN_WEEKS, ge=1, le=60),
+    duree_max: int = Query(default=DEFAULT_STAGE_MAX_WEEKS, ge=1, le=60),
+    debut_min: date = Query(default=DEFAULT_STAGE_START_MIN),
     q: str | None = Query(default=None),
 ):
     where = ["1=1"]
@@ -257,6 +313,11 @@ def list_offres(
     if type_contrat:
         where.append("o.type_contrat = %s")
         params.append(type_contrat)
+    if stage_filter in ("strict", "duree_ok", "compatible"):
+        if type_contrat != "stage":
+            where.append("o.type_contrat = 'stage'")
+        where.append(_stage_filter_clause(stage_filter, "o."))
+        params.extend([duree_max, duree_min, debut_min])
     if statut:
         where.append("o.statut = %s")
         params.append(statut)
@@ -275,7 +336,8 @@ def list_offres(
     sql = f"""
         SELECT o.id, o.source, o.entreprise_id, o.entreprise_nom,
                COALESCE(NULLIF(o.entreprise_resume, ''), e.description, '') AS entreprise_resume,
-               o.titre, o.type_contrat, o.zone, o.ville,
+               o.titre, o.type_contrat, o.duree_semaines_min, o.duree_semaines_max, o.date_debut_stage,
+               o.zone, o.ville,
                COALESCE(o.trajet_tranche, e.trajet_tranche) AS trajet_tranche,
                o.url_directe, o.description, o.date_publication, o.score_ia, o.domaine_ia,
                o.resume_ia, o.statut, o.is_starred, o.date_candidature, o.date_relance,
@@ -295,6 +357,19 @@ def list_offres(
 @app.post("/api/offres")
 def create_offer(payload: OfferCreate):
     ext_id = f"manual-{os.urandom(6).hex()}"
+    dmin = payload.duree_semaines_min
+    dmax = payload.duree_semaines_max
+    start_dt = payload.date_debut_stage
+    if payload.type_contrat == "stage" and (dmin is None or start_dt is None):
+        p_dmin, p_dmax, p_start = extract_stage_timing(payload.titre, payload.description)
+        if dmin is None:
+            dmin = p_dmin
+            dmax = p_dmax
+        elif dmax is None:
+            dmax = dmin
+        if start_dt is None:
+            start_dt = p_start
+
     with db_cursor() as cur:
         cur.execute(
             "SELECT id, description, trajet_tranche FROM entreprises WHERE LOWER(nom) LIKE %s ORDER BY priorite ASC LIMIT 1",
@@ -305,11 +380,12 @@ def create_offer(payload: OfferCreate):
             """
             INSERT INTO offres (
                 source, external_id, dedup_hash, entreprise_id, entreprise_nom, entreprise_resume,
-                titre, type_contrat, zone, ville, trajet_tranche, url_directe, description,
+                titre, type_contrat, duree_semaines_min, duree_semaines_max, date_debut_stage,
+                zone, ville, trajet_tranche, url_directe, description,
                 date_publication, score_ia, statut, is_starred, date_candidature, date_relance, contact_info, notes
             )
             VALUES (
-                'manuel', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                'manuel', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                 CURRENT_DATE, 80, %s, %s, %s, %s, %s, %s
             )
             RETURNING *
@@ -322,6 +398,9 @@ def create_offer(payload: OfferCreate):
                 payload.entreprise_resume or (ent["description"] if ent else None),
                 payload.titre.strip(),
                 payload.type_contrat,
+                dmin,
+                dmax,
+                start_dt,
                 payload.zone,
                 payload.ville,
                 ent["trajet_tranche"] if ent else None,
@@ -554,6 +633,9 @@ def internal_apply_scores(payload: ApplyScoresPayload):
                     domaine_ia = COALESCE(%s, domaine_ia),
                     resume_ia = COALESCE(%s, resume_ia),
                     entreprise_resume = COALESCE(NULLIF(%s, ''), entreprise_resume),
+                    duree_semaines_min = COALESCE(duree_semaines_min, %s),
+                    duree_semaines_max = COALESCE(duree_semaines_max, %s),
+                    date_debut_stage = COALESCE(date_debut_stage, %s),
                     statut = CASE WHEN %s < 55 AND statut = 'À voir' THEN 'Ignorée' ELSE statut END,
                     updated_at = NOW()
                 WHERE id = %s
@@ -563,6 +645,9 @@ def internal_apply_scores(payload: ApplyScoresPayload):
                     item.domaine_ia,
                     item.resume_ia,
                     item.entreprise_resume,
+                    item.duree_semaines_min,
+                    item.duree_semaines_max,
+                    item.date_debut_stage,
                     item.score_ia,
                     item.id,
                 ),
