@@ -37,6 +37,9 @@ CREATE TABLE IF NOT EXISTS entreprises (
     url_carrieres TEXT,
     url_lba TEXT,
     lba_potentiel BOOLEAN DEFAULT FALSE,
+    spontanee_recommandee BOOLEAN NOT NULL DEFAULT FALSE,
+    spontanee_score SMALLINT,
+    spontanee_raison TEXT,
     statut VARCHAR(30) NOT NULL DEFAULT 'Non contactée',
     contact_nom TEXT,
     contact_email TEXT,
@@ -52,6 +55,7 @@ CREATE INDEX IF NOT EXISTS idx_entreprises_zone_prio_statut ON entreprises (zone
 CREATE INDEX IF NOT EXISTS idx_entreprises_siren ON entreprises (siren);
 CREATE INDEX IF NOT EXISTS idx_entreprises_trajet ON entreprises (trajet_tranche);
 CREATE INDEX IF NOT EXISTS idx_entreprises_lba ON entreprises (lba_potentiel);
+CREATE INDEX IF NOT EXISTS idx_entreprises_spontanee ON entreprises (spontanee_recommandee, spontanee_score DESC NULLS LAST) WHERE spontanee_recommandee = TRUE;
 
 CREATE TABLE IF NOT EXISTS offres (
     id SERIAL PRIMARY KEY,

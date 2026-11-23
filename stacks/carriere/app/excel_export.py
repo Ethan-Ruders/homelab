@@ -110,41 +110,15 @@ def _build_offer_rows(items: Iterable[dict]) -> list[list]:
     ]
 
 
-def build_workbook_bytes(offres: Iterable[dict], entreprises: Iterable[dict]) -> bytes:
-    """Create a 3-sheet .xlsx workbook containing Offres, Sélection, and Entreprises."""
-    wb = Workbook()
-    offres_list = list(offres)
-
-    o_headers = [
-        "ID", "Pointée", "Statut", "Contrat", "Durée stage", "Début stage", "Fin stage",
-        "Score IA", "Domaine", "Zone", "Trajet voiture",
-        "Ville", "Entreprise", "Activité entreprise", "Titre du poste", "Résumé IA",
-        "Date publi.", "Date candidature", "Date relance", "Contact", "Source",
-        "Lien direct", "Notes",
-    ]
-    o_widths = [7, 9, 15, 13, 14, 13, 13, 10, 18, 12, 14, 18, 28, 42, 42, 48, 12, 15, 14, 24, 18, 45, 36]
-
-    ws_offres = wb.active
-    ws_offres.title = "Offres"
-    _style_sheet(ws_offres, o_headers, _build_offer_rows(offres_list), link_cols={22}, status_col=3, widths=o_widths)
-
-    ws_sel = wb.create_sheet(title="Sélection")
-    starred_list = [o for o in offres_list if o.get("is_starred")]
-    _style_sheet(ws_sel, o_headers, _build_offer_rows(starred_list), link_cols={22}, status_col=3, widths=o_widths)
-
-    ws_ent = wb.create_sheet(title="Entreprises")
-    e_headers = [
-        "ID", "Priorité", "Statut", "Zone", "Trajet voiture", "Dist. km",
-        "Nom", "Ville", "CP", "Taille", "Effectif", "Code NAF", "Secteur NAF",
-        "Domaines", "Activité / À savoir avant de contacter", "Potentiel LBA",
-        "Site web", "Page carrières", "Fiche LBA", "Contact nom", "Contact email",
-        "Date contact", "Date relance", "Notes", "SIRET",
-    ]
-    e_rows = [
+def _build_company_rows(items: Iterable[dict]) -> list[list]:
+    return [
         [
             e["id"],
             e.get("priorite"),
             e.get("statut") or "Non contactée",
+            "🎯 Oui" if e.get("spontanee_recommandee") else "",
+            e.get("spontanee_score"),
+            e.get("spontanee_raison") or "",
             e.get("zone") or "",
             e.get("trajet_tranche") or "",
             e.get("distance_km"),
@@ -168,16 +142,52 @@ def build_workbook_bytes(offres: Iterable[dict], entreprises: Iterable[dict]) ->
             e.get("notes") or "",
             e.get("siret") or "",
         ]
-        for e in entreprises
+        for e in items
     ]
-    _style_sheet(
-        ws_ent,
-        e_headers,
-        e_rows,
-        link_cols={17, 18, 19},
-        status_col=3,
-        widths=[7, 9, 16, 12, 14, 9, 32, 20, 8, 17, 19, 10, 34, 24, 52, 13, 32, 38, 38, 22, 26, 13, 13, 36, 17],
+
+
+def build_workbook_bytes(offres: Iterable[dict], entreprises: Iterable[dict]) -> bytes:
+    """Create a 4-sheet .xlsx workbook containing Offres, Sélection, Spontanées, and Entreprises."""
+    wb = Workbook()
+    offres_list = list(offres)
+    entreprises_list = list(entreprises)
+
+    o_headers = [
+        "ID", "Pointée", "Statut", "Contrat", "Durée stage", "Début stage", "Fin stage",
+        "Score IA", "Domaine", "Zone", "Trajet voiture",
+        "Ville", "Entreprise", "Activité entreprise", "Titre du poste", "Résumé IA",
+        "Date publi.", "Date candidature", "Date relance", "Contact", "Source",
+        "Lien direct", "Notes",
+    ]
+    o_widths = [7, 9, 15, 13, 14, 13, 13, 10, 18, 12, 14, 18, 28, 42, 42, 48, 12, 15, 14, 24, 18, 45, 36]
+
+    ws_offres = wb.active
+    ws_offres.title = "Offres"
+    _style_sheet(ws_offres, o_headers, _build_offer_rows(offres_list), link_cols={22}, status_col=3, widths=o_widths)
+
+    ws_sel = wb.create_sheet(title="Sélection")
+    starred_list = [o for o in offres_list if o.get("is_starred")]
+    _style_sheet(ws_sel, o_headers, _build_offer_rows(starred_list), link_cols={22}, status_col=3, widths=o_widths)
+
+    e_headers = [
+        "ID", "Priorité", "Statut", "Spontanée", "Score spont.", "Pourquoi candidater",
+        "Zone", "Trajet voiture", "Dist. km",
+        "Nom", "Ville", "CP", "Taille", "Effectif", "Code NAF", "Secteur NAF",
+        "Domaines", "Activité / À savoir avant de contacter", "Potentiel LBA",
+        "Site web", "Page carrières", "Fiche LBA", "Contact nom", "Contact email",
+        "Date contact", "Date relance", "Notes", "SIRET",
+    ]
+    e_widths = [7, 9, 16, 11, 12, 48, 12, 14, 9, 32, 20, 8, 17, 19, 10, 34, 24, 52, 13, 32, 38, 38, 22, 26, 13, 13, 36, 17]
+
+    ws_spont = wb.create_sheet(title="Spontanées")
+    spont_list = sorted(
+        (e for e in entreprises_list if e.get("spontanee_recommandee") and e.get("statut") != "Écartée"),
+        key=lambda e: (-(e.get("spontanee_score") or 0), e.get("nom") or ""),
     )
+    _style_sheet(ws_spont, e_headers, _build_company_rows(spont_list), link_cols={20, 21, 22}, status_col=3, widths=e_widths)
+
+    ws_ent = wb.create_sheet(title="Entreprises")
+    _style_sheet(ws_ent, e_headers, _build_company_rows(entreprises_list), link_cols={20, 21, 22}, status_col=3, widths=e_widths)
 
     buf = io.BytesIO()
     wb.save(buf)

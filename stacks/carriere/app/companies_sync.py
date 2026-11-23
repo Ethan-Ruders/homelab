@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import time
 import unicodedata
 from typing import Any
@@ -306,6 +307,180 @@ EMBARQUE_PENALTY_KEYWORDS = (
     "BOULANGER", "COIFFURE", "CARRELAGE", "CHARPENTE",
 )
 
+FLAGSHIP_FALSE_NAMES = (
+    "ORANGE STORE",
+    "SFR DISTRIBUTION",
+    "OPEN CAMPUS",
+    "PHOTONICS OPEN",
+)
+
+# Exclusions explicites pour la shortlist "Spontanées" (agences bancaires, BTP, écoles hors IT, santé, etc.)
+SPONTANEOUS_EXCLUDE_PATTERNS: tuple[str, ...] = (
+    r"(?<![A-Z0-9])ORANGE STORE(?![A-Z0-9])",
+    r"(?<![A-Z0-9])SFR DISTRIBUTION(?![A-Z0-9])",
+    r"CAISSE LOCALE",
+    r"CAISSE REGIONALE DE CREDIT",
+    r"CAISSE CREDIT AGRICOLE",
+    r"BANQUE CIC",
+    r"BNP PARIBAS",
+    r"CREDIT COOPERATIF",
+    r"CAISSE DES DEPOTS",
+    r"SERVICES DIVERS",
+    r"GROUPE TVA",
+    r"FEDERAL FINANCE",
+    r"ARKEA BANQUE",
+    r"ARKEA DIRECT",
+    r"ARKEA BANKING",
+    r"NATIXIS INTEREPARGNE",
+    r"(?<![A-Z0-9-])BPCE(?![A-Z0-9-]|\s+INFOGERANCE)",
+    r"VETERINAIRE",
+    r"MANAGEMENT",
+    r"EDUSANTE",
+    r"(?<![A-Z0-9])CESI(?![A-Z0-9])",
+    r"OPEN CAMPUS",
+    r"ELEVAGE",
+    r"(?<![A-Z0-9])INSERM(?![A-Z0-9])",
+    r"BIOMASSE",
+    r"RAINETTE",
+    r"BIOTOPE",
+    r"ECR ENVIRONNEMENT",
+    r"FONDASOL",
+    r"GEOTEC",
+    r"(?<![A-Z0-9])ANTEA(?![A-Z0-9])",
+    r"(?<![A-Z0-9])ARTELIA(?![A-Z0-9])",
+    r"(?<![A-Z0-9])APROMO(?![A-Z0-9])",
+    r"(?<![A-Z0-9])SCE(?![A-Z0-9])",
+    r"SEMBREIZH",
+    r"FOURE LAGADEC",
+    r"BUREAUTIQUE",
+    r"GTP 14",
+    r"UNIVERSITE DE CAEN",
+    r"(?<![A-Z0-9])CEDRE(?![A-Z0-9])",
+    r"CEGELEC",
+    r"EIFFAGE ENERGIE",
+    r"PHOTONICS BRETAGNE",
+    r"PHOTONICS OPEN",
+    r"BKTEL",
+    r"CIRCET",
+    r"SEGULA",
+    r"BUREAU VERITAS",
+    r"FLEXCITY",
+    r"ITP SA",
+    r"(?<![A-Z0-9])NPI(?![A-Z0-9])",
+    r"INGELIANCE",
+    r"LOCAL\.FR",
+    r"OKSIIGEN",
+    r"MED\.E\.COM",
+    r"MANGAS\.IO",
+    r"EQUIDECLIC",
+    r"(?<![A-Z0-9])KOUST(?![A-Z0-9])",
+    r"(?<![A-Z0-9])L CENTER(?![A-Z0-9])",
+    r"UNIVERS PAIE",
+    r"SHOP APPLICATION",
+    r"(?<![A-Z0-9])ORISHA(?![A-Z0-9])",
+    r"DL NEGOCE",
+    r"SILAEXPERT",
+    r"KERHIS",
+    r"SOGELINK",
+)
+_SPONTANEOUS_EXCLUDE_RE = re.compile("|".join(SPONTANEOUS_EXCLUDE_PATTERNS))
+
+# (keyword, score, reason_fr, extra_tags_opt, site_opt, careers_opt)
+SPONTANEOUS_TARGETS: tuple[tuple[str, int, str, list[str] | None, str | None, str | None], ...] = (
+    ("THALES", 98, "Leader défense, cybersécurité et IA critique — fort volume de stages et d'alternances à Brest.", None, None, None),
+    ("NAVAL GROUP", 97, "Cybersécurité navale, systèmes de combat et réseaux sécurisés à Guipavas/Brest (≤ 20 min).", None, None, None),
+    ("OVH", 96, "Cloud européen (infra, serveurs, réseaux, sécurité) à Brest — recruteur LBA très formateur.", None, None, None),
+    ("NXP SEMICONDUCTORS", 96, "R&D sécurité matérielle, cryptographie et systèmes sur le campus EffiScience de Caen.", None, None, None),
+    ("CLOUD TEMPLE", 96, "Cloud souverain qualifié SecNumCloud à Caen (infra, cyber, DevSecOps) — potentiel LBA.", ["Cloud", "Cyber", "DevSecOps"], None, None),
+    ("FONDATION B-COM", 96, "IRT de pointe à Lannion (5G/6G, cybersécurité, IA) — excellent pour stage R&D ou alternance.", ["Recherche", "Cyber", "IA", "Réseaux"], "https://b-com.com", None),
+    ("ORANGE", 95, "R&D télécoms, IA et cybersécurité (Orange Innovation Lannion / Orange Business) — très gros recruteur.", None, None, None),
+    ("6CURE", 95, "Pure-player cybersécurité à Caen (anti-DDoS, pentest, SOC) — ciblage idéal en spontanée.", ["Cyber", "Réseaux", "SOC"], "https://www.6cure.com", None),
+    ("BZHUNT", 95, "Pure-player cybersécurité / pentest à Guipavas (Brest) — PME cyber réactive en candidature spontanée.", ["Cyber", "Pentest", "Sécurité"], "https://bzhunt.bzh", None),
+    ("CLARANET", 95, "Spécialiste cloud, DevSecOps, infogérance critique et cybersécurité à Colombelles/Caen.", ["Cloud", "Cyber", "DevSecOps"], "https://www.claranet.com/fr", None),
+    ("SAP LABS", 94, "Centre R&D logiciel, cloud et IA de SAP à Caen — environnement ingénierie de haut niveau.", ["IA", "Cloud", "Logiciel"], "https://www.sap.com/france", None),
+    ("CREDIT MUTUEL ARKEA", 94, "Gros pôle IT interne près de Loperhet (cybersécurité bancaire, data/IA, cloud, architecture SI).", None, None, None),
+    ("EKINOPS", 94, "Équipementier télécom R&D à Lannion (routeurs, SD-WAN, transport optique, sécurité réseau).", None, None, None),
+    ("CNRS", 94, "Laboratoires publics en IA, cyber et systèmes (GREYC à Caen, Lab-STICC à Brest) — très ouverts aux stages 10–12 sem.", None, None, None),
+    ("EXAIL", 93, "Haute technologie à Lannion (navigation, robotique autonome, systèmes critiques et IA).", None, None, None),
+    ("ENSTA", 93, "Laboratoires R&D à Brest en cyber maritime, défense, systèmes et IA — idéal pour stage d'été 10–12 sem.", None, None, None),
+    ("CEA", 93, "Organisme R&D de pointe à Caen (calcul scientifique, systèmes, sécurité et ingénierie).", ["Recherche", "Systèmes", "Cyber"], "https://www.cea.fr", None),
+    ("SOPRA STERIA", 92, "ESN majeure à Guipavas (projets défense, cyber, cloud, génie logiciel) — recruteur potentiel LBA.", None, None, None),
+    ("QUALCOMM", 92, "Site R&D télécoms et systèmes à Lannion — environnement international exigeant.", ["Télécoms", "Systèmes", "R&D"], None, None),
+    ("BPCE INFOGERANCE", 92, "Pôle infra, cloud et sécurité informatique du groupe BPCE à Caen — fort besoin en systèmes/réseaux.", ["Cloud", "Systèmes", "Cyber"], None, None),
+    ("FIME", 92, "Leader du testing et de la sécurité des paiements, biométrie et cryptographie à Caen.", ["Cyber", "Cryptographie", "Testing"], "https://www.fime.com", None),
+    ("ENSICAEN", 92, "École d'ingénieurs et laboratoire GREYC à Caen (cybersécurité, monétique, IA) — bon levier pour stage 10–12 sem.", ["Recherche", "Cyber", "IA"], "https://www.ensicaen.fr", None),
+    ("CAPGEMINI", 91, "Grande ESN présente à Brest et Caen (cybersécurité, IA/data, cloud, systèmes) — potentiel LBA.", None, None, None),
+    ("CGI", 91, "ESN majeure à Brest (incl. entité Défense & Spatial) — projets cyber, cloud et dev + potentiel LBA.", None, None, None),
+    ("ELITT", 91, "Expertise cybersécurité et conformité des systèmes de paiement à Colombelles/Caen — potentiel LBA.", ["Cyber", "Sécurité", "Testing"], "https://www.elitt.com", None),
+    ("OBVIOS", 91, "PME R&D à Lannion spécialisée réseaux 5G privés et IA (spin-off b<>com) — spontanée très pertinente.", ["Réseaux", "5G", "IA"], "https://www.obvios.eu", None),
+    ("SII", 90, "ESN ingénierie implantée à Brest, Lannion et Caen (défense, télécoms, cyber et systèmes).", None, None, None),
+    ("ALE INTERNATIONAL", 90, "Alcatel-Lucent Enterprise à Guipavas (250–499 sal.) — R&D réseaux d'entreprise, télécoms et sécurité.", ["Réseaux", "Télécoms", "Cyber"], "https://www.al-enterprise.com/fr-fr", None),
+    ("GENESYS CLOUD", 90, "Centre R&D cloud et IA à Guipavas/Brest — belle opportunité tech hors circuit classique.", ["Cloud", "IA", "R&D"], None, None),
+    ("ATOS", 90, "Acteur majeur infogérance, cloud et cybersécurité à Colombelles/Caen.", None, None, None),
+    ("ADISTA", 90, "Opérateur B2B cloud, réseaux managés et cybersécurité à Colombelles/Caen — potentiel LBA.", ["Cloud", "Réseaux", "Cyber"], "https://www.adista.fr", None),
+    ("CONSCIENCE ROBOTICS", 90, "Start-up IA et robotique autonome à Caen — recruteur potentiel LBA très accessible en spontanée.", ["IA", "Robotique", "Logiciel"], None, None),
+    ("DATEXIM", 90, "PME R&D spécialisée IA et deep learning à Caen — spontanée pertinente pour stage 10–12 sem.", ["IA", "Deep Learning", "R&D"], None, None),
+    ("VOXYGEN", 90, "PME IA spécialisée synthèse vocale et traitement du signal près de Lannion (Pleumeur-Bodou).", ["IA", "Audio/NLP", "Logiciel"], None, None),
+    ("ALTEN", 90, "Conseil en ingénierie télécoms, systèmes et IT à Lannion — volume régulier de stages/alternances.", None, None, None),
+    ("WORLDLINE", 89, "Acteur majeur des paiements sécurisés et systèmes critiques à Colombelles/Caen.", ["Cyber", "Systèmes", "Paiement"], None, None),
+    ("ACCENTURE", 88, "Pôle Tech/Cloud/IA à Brest (100–199 sal.) — recruteur potentiel LBA.", None, None, None),
+    ("INETUM", 88, "ESN implantée à Brest, Lannion et Caen (cloud, cybersécurité, dev) — ouverte aux candidatures spontanées.", None, None, None),
+    ("INFOTEL", 87, "ESN et éditeur logiciel à Brest (≤ 20 min, 100–199 sal.) — potentiel LBA sur data, cloud et dev.", None, None, None),
+    ("ALTRAN TECHNOLOGIES", 87, "Capgemini Engineering à Caen (200–249 sal.) — ingénierie systèmes et R&D.", None, None, None),
+    ("YOUTRUST", 87, "Acteur confiance numérique / signature électronique / sécurité à Caen (100–199 sal.).", ["Cyber", "Confiance Numérique", "Logiciel"], None, None),
+    ("AXIONE", 86, "Opérateur d'infrastructures télécoms et réseaux à Gouesnou/Brest — potentiel LBA.", None, None, None),
+    ("OPEN", 86, "ESN implantée à Lannion (50–99 sal.) — projets SI, cloud et développement.", None, None, None),
+    ("ASTEN", 85, "Groupe brestois spécialisé hébergement cloud, infra et développement (Gouesnou) — potentiel LBA.", ["Cloud", "Infra", "Développement"], None, None),
+    ("PRESCOM", 85, "Systèmes télécoms critiques (défense / sécurité civile) à Lannion — bon fit systèmes/réseaux.", ["Télécoms", "Défense", "Réseaux"], None, None),
+    ("EXPERIS", 85, "ESN IT, infrastructures et cybersécurité présente à Caen et Lannion — potentiel LBA.", None, None, None),
+    ("ASI", 84, "ESN conseil IT, data et dev à Brest (50–99 sal.) — recruteur potentiel LBA.", None, None, None),
+    ("IT LINK", 84, "Ingénierie des systèmes connectés et logiciels à Brest — recruteur potentiel LBA.", None, None, None),
+    ("APIZEE", 84, "Éditeur SaaS cloud / WebRTC à Lannion — recruteur potentiel LBA réactif en spontanée.", None, None, None),
+    ("O.S.I. NX", 84, "Infogérance, infrastructures systèmes/réseaux et cloud à Caen — recruteur potentiel LBA.", None, None, None),
+    ("TDF", 84, "Opérateur d'infrastructures télécoms et réseaux critiques à Saint-Contest/Caen.", ["Télécoms", "Réseaux", "Infra"], None, None),
+    ("WE+", 83, "ESN data, cloud et dev à Brest (≤ 20 min) — taille humaine propice aux spontanées.", None, None, None),
+    ("NEXT DECISION", 83, "Cabinet data, BI et IA à Brest — bon profil pour stage ou alternance orienté data/IA.", ["Data", "IA", "BI"], None, None),
+    ("ALTICAP", 83, "Intégrateur IT, cloud et sécurité à Colombelles/Caen (50–99 sal.) — potentiel LBA.", None, None, None),
+    ("ATTINEOS", 83, "ESN développement, cloud et cybersécurité à Caen — bonne accessibilité en spontanée.", None, None, None),
+    ("CLEAR2PAY", 83, "Éditeur de solutions de paiement et sécurité financière à Colombelles/Caen.", ["Sécurité", "Logiciel", "Paiement"], None, None),
+    ("RANDSTAD DIGITAL", 82, "ESN IT et infrastructures à Guipavas/Brest (≤ 20 min, 50–99 sal.).", None, None, None),
+    ("ELIPS SOLUTION", 82, "Conseil IT et infrastructures à Caen — recruteur potentiel LBA.", None, None, None),
+    ("NCI", 82, "Hébergement, datacenter et infrastructures cloud près de Caen — potentiel LBA.", None, None, None),
+    ("MASSELIN COMMUNICATION", 81, "Infrastructures, hébergement et réseaux à Ifs/Caen (50–99 sal.) — potentiel LBA.", None, None, None),
+    ("BOONDMANAGER", 80, "Éditeur SaaS français basé à Brest (50–99 sal.) — solide équipe produit/tech.", None, None, None),
+    ("FORTERRO", 80, "Éditeur logiciel à Caen (50–99 sal.) — recruteur potentiel LBA.", None, None, None),
+    ("ID3I", 79, "ESN IT et systèmes à Brest (≤ 20 min) — recruteur potentiel LBA.", None, None, None),
+    ("NORGAY", 78, "Structure développement logiciel à Brest (≤ 20 min, 100–199 sal.) — potentiel LBA.", None, None, None),
+)
+
+_SIZE_RANK: dict[str, int] = {
+    "53": 10, "52": 9, "51": 8, "42": 7, "41": 6, "32": 5, "31": 4, "22": 3, "21": 2, "12": 1, "11": 0,
+}
+
+_GROUP_ALIASES: tuple[tuple[str, str], ...] = (
+    ("CREDIT MUTUEL ARKEA", "ARKEA"),
+    ("ARKEA", "ARKEA"),
+    ("ORANGE BUSINESS", "ORANGE"),
+    ("ORANGE", "ORANGE"),
+    ("EXAIL ROBOTICS", "EXAIL"),
+    ("EXAIL", "EXAIL"),
+    ("CGI", "CGI"),
+    ("CENTRE NATIONAL DE LA RECHERCHE SCIENTIFIQUE", "CNRS"),
+    ("CNRS", "CNRS"),
+    ("ASTEN", "ASTEN"),
+    ("THALES", "THALES"),
+    ("SOPRA STERIA", "SOPRA"),
+    ("CAPGEMINI", "CAPGEMINI"),
+    ("SOCIETE POUR L'INFORMATIQUE INDUSTRIELLE", "SII"),
+    ("SII", "SII"),
+    ("INETUM", "INETUM"),
+    ("EXPERIS", "EXPERIS"),
+)
+
+
+def _word_match(kw: str, norm_name: str) -> bool:
+    return bool(re.search(rf"(?<![A-Z0-9]){re.escape(kw)}(?![A-Z0-9])", norm_name))
+
 
 def _norm(txt: str | None) -> str:
     s = unicodedata.normalize("NFKD", txt or "")
@@ -315,10 +490,129 @@ def _norm(txt: str | None) -> str:
 
 def _match_flagship(name: str) -> dict[str, Any] | None:
     n = _norm(name)
+    if any(bad in n for bad in FLAGSHIP_FALSE_NAMES):
+        return None
     for kw, prof in FLAGSHIP_PROFILES:
-        if kw in n:
+        if _word_match(kw, n):
             return prof
     return None
+
+
+def _spontaneous_group_key(name: str) -> str:
+    n = _norm(name)
+    for kw, grp in _GROUP_ALIASES:
+        if _word_match(kw, n):
+            return grp
+    return n
+
+
+def _match_spontaneous_target(name: str):
+    n = _norm(name)
+    if _SPONTANEOUS_EXCLUDE_RE.search(n):
+        return None
+    for row in SPONTANEOUS_TARGETS:
+        if _word_match(row[0], n):
+            return row
+    return None
+
+
+def refresh_spontaneous_recommendations(cur) -> dict[str, Any]:
+    """Curate top companies for spontaneous applications (1 best establishment per group per zone)."""
+    cur.execute(
+        """
+        SELECT id, nom, zone, trajet_tranche, distance_km, code_naf, tranche_effectif,
+               lba_potentiel, url_carrieres, site_web, statut
+        FROM entreprises
+        """
+    )
+    rows = [dict(r) for r in cur.fetchall()]
+    winners: dict[tuple[str, str], tuple[tuple[Any, ...], dict[str, Any]]] = {}
+
+    for r in rows:
+        target = _match_spontaneous_target(r["nom"])
+        if not target:
+            continue
+        _, score, reason, tags, site, careers = target
+        grp = _spontaneous_group_key(r["nom"])
+        n = _norm(r["nom"])
+        # Rank within same (zone, group): prefer LBA, <=20min, ORANGE BUSINESS / core IT NAF, career URL, size, closer distance
+        rank = (
+            1 if r.get("lba_potentiel") else 0,
+            1 if r.get("trajet_tranche") == "<=20min" else 0,
+            1 if "ORANGE BUSINESS" in n or str(r.get("code_naf") or "").startswith(("62.", "63.", "58.")) else 0,
+            1 if r.get("url_carrieres") else 0,
+            _SIZE_RANK.get(str(r.get("tranche_effectif") or ""), -1),
+            -(float(r["distance_km"]) if r.get("distance_km") is not None else 999.0),
+            -r["id"],
+        )
+        key = (r["zone"], grp)
+        if key not in winners or rank > winners[key][0]:
+            winners[key] = (rank, {
+                "id": r["id"],
+                "zone": r["zone"],
+                "score": score,
+                "reason": reason,
+                "tags": tags,
+                "site": site,
+                "careers": careers,
+            })
+
+    winner_ids = {v[1]["id"] for v in winners.values()}
+
+    if winner_ids:
+        cur.execute(
+            """
+            UPDATE entreprises SET
+                spontanee_recommandee = FALSE,
+                spontanee_score = NULL,
+                spontanee_raison = NULL,
+                updated_at = NOW()
+            WHERE spontanee_recommandee = TRUE
+              AND id != ALL(%s)
+              AND statut IN ('Non contactée', 'Écartée')
+            """,
+            (list(winner_ids),),
+        )
+    else:
+        cur.execute(
+            """
+            UPDATE entreprises SET
+                spontanee_recommandee = FALSE,
+                spontanee_score = NULL,
+                spontanee_raison = NULL,
+                updated_at = NOW()
+            WHERE spontanee_recommandee = TRUE
+              AND statut IN ('Non contactée', 'Écartée')
+            """
+        )
+
+    for _, info in winners.values():
+        cur.execute(
+            """
+            UPDATE entreprises SET
+                spontanee_recommandee = TRUE,
+                spontanee_score = %s,
+                spontanee_raison = %s,
+                domaine_tags = COALESCE(%s, domaine_tags),
+                site_web = COALESCE(NULLIF(site_web, ''), %s),
+                url_carrieres = COALESCE(NULLIF(url_carrieres, ''), %s),
+                updated_at = NOW()
+            WHERE id = %s
+            """,
+            (
+                info["score"],
+                info["reason"],
+                info["tags"],
+                info["site"],
+                info["careers"],
+                info["id"],
+            ),
+        )
+
+    by_zone: dict[str, int] = {}
+    for _, info in winners.values():
+        by_zone[info["zone"]] = by_zone.get(info["zone"], 0) + 1
+    return {"total_spontanees": len(winner_ids), "par_zone": by_zone}
 
 
 def _size_bucket(cat_ent: str | None, tranche: str | None, flagship: dict[str, Any] | None) -> tuple[str, int]:
@@ -683,6 +977,8 @@ def sync_all_companies(cur, force_refresh_zones: bool = False) -> dict[str, Any]
                 "sirene_major_upserts": major_cnt,
                 **lba_info,
             }
+
+    summary["spontanees"] = refresh_spontaneous_recommendations(cur)
 
     cur.execute(
         """

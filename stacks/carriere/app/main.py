@@ -83,6 +83,9 @@ class CompanyCreate(BaseModel):
     url_carrieres: str | None = None
     statut: str = Field(default="Non contactée")
     priorite: int = Field(default=2, ge=1, le=3)
+    spontanee_recommandee: bool = False
+    spontanee_score: int | None = Field(default=None, ge=0, le=100)
+    spontanee_raison: str | None = None
     contact_nom: str | None = None
     contact_email: str | None = None
     date_contact: date | None = None
@@ -101,6 +104,9 @@ class CompanyPatch(BaseModel):
     url_carrieres: str | None = None
     description: str | None = None
     priorite: int | None = Field(default=None, ge=1, le=3)
+    spontanee_recommandee: bool | None = None
+    spontanee_score: int | None = Field(default=None, ge=0, le=100)
+    spontanee_raison: str | None = None
 
 
 class ScoreItem(BaseModel):
@@ -206,6 +212,11 @@ def _stage_filter_clause(mode: str, alias: str = "o.") -> str:
 @app.get("/selection", response_class=HTMLResponse)
 @app.get("/selection/stages", response_class=HTMLResponse)
 @app.get("/selection/alternances", response_class=HTMLResponse)
+@app.get("/spontanees", response_class=HTMLResponse)
+@app.get("/spontanees/loperhet", response_class=HTMLResponse)
+@app.get("/spontanees/lannion", response_class=HTMLResponse)
+@app.get("/spontanees/caen", response_class=HTMLResponse)
+@app.get("/entreprises", response_class=HTMLResponse)
 def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
@@ -291,6 +302,22 @@ def get_stats():
             "compatible": sf_row["compatible"],
         }
 
+        cur.execute(
+            """
+            SELECT zone,
+                   COUNT(*)::int AS total,
+                   SUM(CASE WHEN COALESCE(spontanee_score, 0) >= 90 THEN 1 ELSE 0 END)::int AS top_prio,
+                   SUM(CASE WHEN lba_potentiel THEN 1 ELSE 0 END)::int AS lba,
+                   SUM(CASE WHEN statut NOT IN ('Non contactée', 'Écartée') THEN 1 ELSE 0 END)::int AS suivies
+            FROM entreprises
+            WHERE spontanee_recommandee = TRUE AND statut != 'Écartée'
+            GROUP BY zone
+            ORDER BY zone
+            """
+        )
+        spontanees_zone = [dict(r) for r in cur.fetchall()]
+        spontanees_total = sum(x["total"] for x in spontanees_zone)
+
         cur.execute("SELECT id, started_at, finished_at, type, status, summary FROM collectes ORDER BY id DESC LIMIT 1")
         row = cur.fetchone()
         last_collect = _serialize_dates([dict(row)])[0] if row else None
@@ -303,6 +330,8 @@ def get_stats():
         "offres_pointees": offres_pointees,
         "stages_filtre": stages_filtre,
         "entreprises_par_zone": entreprises_zone,
+        "spontanees_par_zone": spontanees_zone,
+        "spontanees_total": spontanees_total,
         "relances": relances,
         "derniere_collecte": last_collect,
     }
@@ -461,6 +490,8 @@ def list_entreprises(
     trajet_tranche: str | None = Query(default=None),
     taille_categorie: str | None = Query(default=None),
     lba_potentiel: bool | None = Query(default=None),
+    spontanee: bool | None = Query(default=None),
+    score_min: int | None = Query(default=None),
     statut: str | None = Query(default=None),
     q: str | None = Query(default=None),
 ):
@@ -478,14 +509,26 @@ def list_entreprises(
     if lba_potentiel is not None:
         where.append("e.lba_potentiel = %s")
         params.append(lba_potentiel)
+    if spontanee is True:
+        where.append("e.spontanee_recommandee = TRUE")
+        if score_min is not None:
+            where.append("COALESCE(e.spontanee_score, 0) >= %s")
+            params.append(score_min)
+        if not statut:
+            where.append("e.statut != 'Écartée'")
     if statut:
         where.append("e.statut = %s")
         params.append(statut)
     if q:
-        where.append("(e.nom ILIKE %s OR COALESCE(e.ville,'') ILIKE %s OR COALESCE(e.description,'') ILIKE %s OR COALESCE(e.libelle_naf,'') ILIKE %s)")
+        where.append("(e.nom ILIKE %s OR COALESCE(e.ville,'') ILIKE %s OR COALESCE(e.description,'') ILIKE %s OR COALESCE(e.libelle_naf,'') ILIKE %s OR COALESCE(e.spontanee_raison,'') ILIKE %s)")
         like = f"%{q.strip()}%"
-        params.extend([like, like, like, like])
+        params.extend([like, like, like, like, like])
 
+    order_sql = (
+        "ORDER BY e.spontanee_score DESC NULLS LAST, e.lba_potentiel DESC, e.priorite ASC, e.distance_km ASC NULLS LAST, e.nom ASC"
+        if spontanee is True
+        else "ORDER BY e.priorite ASC, e.lba_potentiel DESC, e.distance_km ASC NULLS LAST, e.nom ASC"
+    )
     sql = f"""
         SELECT e.*, COALESCE(oc.cnt, 0)::int AS nb_offres
         FROM entreprises e
@@ -496,7 +539,7 @@ def list_entreprises(
             GROUP BY entreprise_id
         ) oc ON oc.entreprise_id = e.id
         WHERE {' AND '.join(where)}
-        ORDER BY e.priorite ASC, e.lba_potentiel DESC, e.distance_km ASC NULLS LAST, e.nom ASC
+        {order_sql}
         LIMIT 1000
     """
     with db_cursor(commit=False) as cur:
@@ -512,9 +555,10 @@ def create_company(payload: CompanyCreate):
             INSERT INTO entreprises (
                 siret, nom, zone, ville, trajet_tranche, taille_categorie,
                 priorite, description, site_web, url_carrieres, statut,
+                spontanee_recommandee, spontanee_score, spontanee_raison,
                 contact_nom, contact_email, date_contact, date_relance, notes, source
             )
-            VALUES (NULL, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'manuel')
+            VALUES (NULL, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'manuel')
             RETURNING *
             """,
             (
@@ -528,6 +572,9 @@ def create_company(payload: CompanyCreate):
                 payload.site_web,
                 payload.url_carrieres,
                 payload.statut,
+                payload.spontanee_recommandee,
+                payload.spontanee_score,
+                payload.spontanee_raison,
                 payload.contact_nom,
                 payload.contact_email,
                 payload.date_contact,

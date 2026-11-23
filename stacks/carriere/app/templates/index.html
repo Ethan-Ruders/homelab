@@ -279,6 +279,36 @@
       border-color: #facc15;
       color: #facc15;
     }
+    .target-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 8px;
+      width: 34px;
+      height: 32px;
+      font-size: 0.95rem;
+      line-height: 1;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+    }
+    .target-btn:hover { border-color: var(--green); color: #86efac; transform: scale(1.06); }
+    .target-btn.targeted {
+      background: rgba(34, 197, 94, 0.16);
+      border-color: var(--green);
+      color: #86efac;
+    }
+    .reason-pill {
+      font-size: 0.8rem;
+      color: #bae6fd;
+      background: rgba(14, 165, 233, 0.12);
+      border-left: 3px solid var(--accent);
+      padding: 5px 8px;
+      border-radius: 4px;
+      margin-bottom: 6px;
+    }
   </style>
 </head>
 <body>
@@ -305,6 +335,15 @@
         <button class="dropdown-item" onclick="openSelectionView('stage')"><span>Stages sélectionnés</span><span class="badge b-stage" id="dd-sel-stage">0</span></button>
         <button class="dropdown-item" onclick="openSelectionView('alternance')"><span>Alternances sélectionnées</span><span class="badge b-alt" id="dd-sel-alt">0</span></button>
         <button class="dropdown-item" onclick="openSelectionView('')"><span>Toute ma sélection</span><span class="badge b-zone" id="dd-sel-all">0</span></button>
+      </div>
+    </div>
+    <div class="nav-dropdown" id="dd-spontanees">
+      <button class="tab-btn" data-tab="spontanees">&#127919; Spontanées (<span id="tab-count-spont">0</span>) &#9662;</button>
+      <div class="dropdown-menu">
+        <button class="dropdown-item" onclick="openSpontaneesView('')"><span>Toutes les cibles</span><span class="badge b-zone" id="dd-spont-all">0</span></button>
+        <button class="dropdown-item" onclick="openSpontaneesView('loperhet')"><span>Loperhet / Brest</span><span class="badge b-lba" id="dd-spont-loperhet">0</span></button>
+        <button class="dropdown-item" onclick="openSpontaneesView('lannion')"><span>Lannion</span><span class="badge b-lba" id="dd-spont-lannion">0</span></button>
+        <button class="dropdown-item" onclick="openSpontaneesView('caen')"><span>Caen</span><span class="badge b-lba" id="dd-spont-caen">0</span></button>
       </div>
     </div>
     <button class="tab-btn" data-tab="entreprises">Entreprises (<span id="tab-count-ent">0</span>)</button>
@@ -454,6 +493,62 @@
     </div>
   </section>
 
+  <section id="panel-spontanees" class="panel">
+    <div class="subtabs" id="spontanees-subtabs">
+      <button class="subtab-btn active" data-zone="" onclick="openSpontaneesView('')">Toutes les cibles (<span id="sub-spont-all">0</span>)</button>
+      <button class="subtab-btn" data-zone="loperhet" onclick="openSpontaneesView('loperhet')">Loperhet / Brest (<span id="sub-spont-loperhet">0</span>)</button>
+      <button class="subtab-btn" data-zone="lannion" onclick="openSpontaneesView('lannion')">Lannion (<span id="sub-spont-lannion">0</span>)</button>
+      <button class="subtab-btn" data-zone="caen" onclick="openSpontaneesView('caen')">Caen (<span id="sub-spont-caen">0</span>)</button>
+    </div>
+    <div class="filters">
+      <input type="search" id="f-spont-q" placeholder="Rechercher cible spontanée, domaine, ville..." />
+      <select id="f-spont-score">
+        <option value="">Toutes les cibles</option>
+        <option value="90">Priorité absolue (&ge; 90)</option>
+        <option value="80">Très bon potentiel (&ge; 80)</option>
+      </select>
+      <select id="f-spont-trajet">
+        <option value="">&le; 30 min</option>
+        <option value="<=20min">&le; 20 min</option>
+        <option value="20-30min">20–30 min</option>
+      </select>
+      <select id="f-spont-lba">
+        <option value="">Potentiel LBA : Tous</option>
+        <option value="true">Potentiel Alternance LBA</option>
+      </select>
+      <select id="f-spont-statut">
+        <option value="">Actives (hors écartées)</option>
+        <option value="Non contactée">Non contactée</option>
+        <option value="À contacter">À contacter</option>
+        <option value="Contactée">Contactée</option>
+        <option value="Relancée">Relancée</option>
+        <option value="Entretien">Entretien</option>
+        <option value="En attente">En attente</option>
+        <option value="Refus">Refus</option>
+        <option value="Écartée">Écartée</option>
+      </select>
+      <span class="muted">Sélection triée (Cyber, IA, Cloud, Systèmes &amp; Réseaux · 1 entité/groupe/zone). Clique sur &#127919; dans <strong>Entreprises</strong> ou ici pour ajuster.</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>&#127919;</th>
+            <th>Score</th>
+            <th>Entreprise &amp; Taille</th>
+            <th>Pourquoi candidater &amp; Activité</th>
+            <th>Zone / Trajet</th>
+            <th>Liens &amp; Offres</th>
+            <th>Statut</th>
+            <th>Contact / Date</th>
+            <th>Éditer</th>
+          </tr>
+        </thead>
+        <tbody id="spont-tbody"></tbody>
+      </table>
+    </div>
+  </section>
+
   <section id="panel-entreprises" class="panel">
     <div class="filters">
       <input type="search" id="f-ent-q" placeholder="Rechercher entreprise, ville, secteur, activité..." />
@@ -496,6 +591,7 @@
       <table>
         <thead>
           <tr>
+            <th>&#127919;</th>
             <th>Priorité</th>
             <th>Entreprise &amp; Taille</th>
             <th>Activité / Ce qu'elle fait</th>
@@ -524,9 +620,11 @@ const ZONE_LABELS = { loperhet: "Loperhet / Brest", lannion: "Lannion", caen: "C
 
 let offersCache = [];
 let starredCache = [];
+let spontaneesCache = [];
 let companiesCache = [];
 let currentOfferContract = "";
 let currentSelContract = "";
+let currentSpontZone = "";
 
 function esc(s) {
   return String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
@@ -593,6 +691,18 @@ async function loadStats() {
   document.getElementById("sub-sel-stage").textContent = selStageCnt;
   document.getElementById("sub-sel-alt").textContent = selAltCnt;
 
+  const spontByZone = Object.fromEntries((st.spontanees_par_zone || []).map(x => [x.zone, x.total]));
+  const spontAll = st.spontanees_total || 0;
+  document.getElementById("tab-count-spont").textContent = spontAll;
+  document.getElementById("dd-spont-all").textContent = spontAll;
+  document.getElementById("dd-spont-loperhet").textContent = spontByZone["loperhet"] || 0;
+  document.getElementById("dd-spont-lannion").textContent = spontByZone["lannion"] || 0;
+  document.getElementById("dd-spont-caen").textContent = spontByZone["caen"] || 0;
+  document.getElementById("sub-spont-all").textContent = spontAll;
+  document.getElementById("sub-spont-loperhet").textContent = spontByZone["loperhet"] || 0;
+  document.getElementById("sub-spont-lannion").textContent = spontByZone["lannion"] || 0;
+  document.getElementById("sub-spont-caen").textContent = spontByZone["caen"] || 0;
+
   const sf = st.stages_filtre || {};
   const fitSel = document.getElementById("f-offres-stage-fit");
   if (fitSel) {
@@ -604,7 +714,7 @@ async function loadStats() {
   document.getElementById("kpi-cards").innerHTML = `
     <div class="card"><h3>Offres actives</h3><div class="kpi-val">${totalOffres}</div><div class="kpi-sub"><a href="/offres/stages" onclick="event.preventDefault(); openOffersView('stage');">Stages : ${stageCnt}</a> · <a href="/offres/alternances" onclick="event.preventDefault(); openOffersView('alternance');">Alternances : ${altCnt}</a> · <a href="/selection" onclick="event.preventDefault(); openSelectionView('');">&#9733; ${selAllCnt}</a></div></div>
     <div class="card"><h3>Candidatures actives</h3><div class="kpi-val">${(byStat["Postulée"] || 0) + (byStat["Relancée"] || 0) + (byStat["En attente"] || 0)}</div><div class="kpi-sub">Entretiens : ${byStat["Entretien"] || 0} · Acceptées : ${byStat["Accepté"] || 0}</div></div>
-    <div class="card"><h3>Entreprises (&le; 30 min)</h3><div class="kpi-val">${totalEnt}</div><div class="kpi-sub">Grands groupes &amp; ETI : ${grandsEnt}</div></div>
+    <div class="card"><h3>Entreprises (&le; 30 min)</h3><div class="kpi-val">${totalEnt}</div><div class="kpi-sub"><a href="/spontanees" onclick="event.preventDefault(); openSpontaneesView('');">&#127919; Spontanées recommandées : ${spontAll}</a> · Grands/ETI : ${grandsEnt}</div></div>
     <div class="card"><h3>Relances &ge; 10j</h3><div class="kpi-val" style="color:${st.relances.length ? '#f59e0b' : '#22c55e'}">${st.relances.length}</div><div class="kpi-sub">Candidatures sans réponse &gt; 10 jours</div></div>
   `;
 
@@ -748,33 +858,30 @@ async function loadSelection() {
   document.getElementById("selection-tbody").innerHTML = starredCache.map(renderOfferRow).join("") || `<tr><td colspan="9" class="muted">Aucune offre pointée dans cette catégorie. Clique sur l'étoile &#9734; dans l'onglet Offres pour ajouter des offres à ta sélection.</td></tr>`;
 }
 
-async function loadEntreprises() {
-  const params = new URLSearchParams();
-  const q = document.getElementById("f-ent-q").value.trim();
-  const zone = document.getElementById("f-ent-zone").value;
-  const trajet = document.getElementById("f-ent-trajet").value;
-  const taille = document.getElementById("f-ent-taille").value;
-  const lba = document.getElementById("f-ent-lba").value;
-  const statut = document.getElementById("f-ent-statut").value;
-  if (q) params.set("q", q);
-  if (zone) params.set("zone", zone);
-  if (trajet) params.set("trajet_tranche", trajet);
-  if (taille) params.set("taille_categorie", taille);
-  if (lba) params.set("lba_potentiel", lba);
-  if (statut) params.set("statut", statut);
-
-  companiesCache = await api(`/api/entreprises?${params.toString()}`);
-  document.getElementById("tab-count-ent").textContent = companiesCache.length;
-
-  document.getElementById("ent-tbody").innerHTML = companiesCache.map(e => `
+function renderCompanyRow(e, mode) {
+  const targeted = Boolean(e.spontanee_recommandee);
+  const scoreVal = e.spontanee_score;
+  const rankBadge = mode === "spont"
+    ? (scoreVal !== null && scoreVal !== undefined
+        ? `<span class="badge ${scoreVal >= 90 ? 'b-score-hi' : 'b-score-mid'}">${scoreVal}/100</span>`
+        : `<span class="badge b-zone">Cible</span>`)
+    : `<span class="badge ${e.priorite === 1 ? 'b-score-hi' : e.priorite === 2 ? 'b-score-mid' : 'b-score-lo'}">P${e.priorite}</span>`;
+  const reasonBlock = (mode === "spont" || targeted) && e.spontanee_raison
+    ? `<div class="reason-pill">${esc(e.spontanee_raison)}</div>`
+    : "";
+  return `
     <tr>
-      <td><span class="badge ${e.priorite === 1 ? 'b-score-hi' : e.priorite === 2 ? 'b-score-mid' : 'b-score-lo'}">P${e.priorite}</span></td>
+      <td>
+        <button class="target-btn ${targeted ? 'targeted' : ''}" title="${targeted ? 'Retirer des spontanées' : 'Cibler en candidature spontanée'}" onclick="toggleCompanySpont(${e.id}, ${!targeted})">&#127919;</button>
+      </td>
+      <td>${rankBadge}</td>
       <td>
         <strong>${esc(e.nom)}</strong>
         <div class="muted">${esc(e.taille_categorie || "")} · ${esc(e.effectif_label || "")}</div>
         ${e.lba_potentiel ? `<span class="badge b-lba" style="margin-top:4px;">Potentiel Alternance LBA</span>` : ""}
       </td>
       <td>
+        ${reasonBlock}
         <div class="desc-snippet">${esc(e.description || e.libelle_naf || "")}</div>
         <div class="muted" style="margin-top:4px;">NAF ${esc(e.code_naf || "")} · ${(e.domaine_tags || []).map(esc).join(", ")}</div>
       </td>
@@ -801,11 +908,68 @@ async function loadEntreprises() {
       </td>
       <td><button class="btn" onclick="openCompanyDrawer(${e.id})">Fiche</button></td>
     </tr>
-  `).join("") || `<tr><td colspan="8" class="muted">Aucune entreprise trouvée.</td></tr>`;
+  `;
+}
+
+async function loadSpontanees() {
+  const params = new URLSearchParams({ spontanee: "true" });
+  const q = document.getElementById("f-spont-q").value.trim();
+  const scoreMin = document.getElementById("f-spont-score").value;
+  const trajet = document.getElementById("f-spont-trajet").value;
+  const lba = document.getElementById("f-spont-lba").value;
+  const statut = document.getElementById("f-spont-statut").value;
+  if (currentSpontZone) params.set("zone", currentSpontZone);
+  if (q) params.set("q", q);
+  if (scoreMin) params.set("score_min", scoreMin);
+  if (trajet) params.set("trajet_tranche", trajet);
+  if (lba) params.set("lba_potentiel", lba);
+  if (statut) params.set("statut", statut);
+
+  spontaneesCache = await api(`/api/entreprises?${params.toString()}`);
+
+  document.getElementById("spont-tbody").innerHTML = spontaneesCache.map(e => renderCompanyRow(e, "spont")).join("") || `<tr><td colspan="9" class="muted">Aucune cible spontanée correspondante dans ce bassin.</td></tr>`;
+}
+
+async function loadEntreprises() {
+  const params = new URLSearchParams();
+  const q = document.getElementById("f-ent-q").value.trim();
+  const zone = document.getElementById("f-ent-zone").value;
+  const trajet = document.getElementById("f-ent-trajet").value;
+  const taille = document.getElementById("f-ent-taille").value;
+  const lba = document.getElementById("f-ent-lba").value;
+  const statut = document.getElementById("f-ent-statut").value;
+  if (q) params.set("q", q);
+  if (zone) params.set("zone", zone);
+  if (trajet) params.set("trajet_tranche", trajet);
+  if (taille) params.set("taille_categorie", taille);
+  if (lba) params.set("lba_potentiel", lba);
+  if (statut) params.set("statut", statut);
+
+  companiesCache = await api(`/api/entreprises?${params.toString()}`);
+  document.getElementById("tab-count-ent").textContent = companiesCache.length;
+
+  document.getElementById("ent-tbody").innerHTML = companiesCache.map(e => renderCompanyRow(e, "ent")).join("") || `<tr><td colspan="9" class="muted">Aucune entreprise trouvée.</td></tr>`;
 }
 
 function findOfferById(id) {
   return offersCache.find(x => x.id === id) || starredCache.find(x => x.id === id);
+}
+
+function findCompanyById(id) {
+  return companiesCache.find(x => x.id === id) || spontaneesCache.find(x => x.id === id);
+}
+
+async function toggleCompanySpont(id, spontanee_recommandee) {
+  const payload = { spontanee_recommandee };
+  if (spontanee_recommandee) {
+    const existing = findCompanyById(id);
+    if (existing && (existing.spontanee_score === null || existing.spontanee_score === undefined)) {
+      payload.spontanee_score = existing.priorite === 1 ? 85 : 75;
+    }
+  }
+  await api(`/api/entreprises/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
+  showToast(spontanee_recommandee ? `Entreprise #${id} ajoutée à 🎯 Spontanées` : `Entreprise #${id} retirée de 🎯 Spontanées`);
+  await Promise.all([loadSpontanees(), loadEntreprises(), loadStats()]);
 }
 
 async function toggleOfferStar(id, is_starred) {
@@ -831,7 +995,7 @@ async function quickCompanyStatus(id, statut) {
   }
   await api(`/api/entreprises/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
   showToast(`Entreprise #${id} → ${statut}`);
-  loadStats();
+  await Promise.all([loadStats(), loadSpontanees(), loadEntreprises()]);
 }
 
 function closeDrawer() {
@@ -903,7 +1067,7 @@ async function saveOfferDrawer(id) {
 }
 
 function openCompanyDrawer(id) {
-  const e = companiesCache.find(x => x.id === id);
+  const e = findCompanyById(id);
   if (!e) return;
   document.getElementById("drawer-content").innerHTML = `
     <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -911,6 +1075,11 @@ function openCompanyDrawer(id) {
       <button class="btn" onclick="closeDrawer()">Fermer</button>
     </div>
     <div class="muted">${esc(e.adresse || e.ville || "")} · ${esc(e.trajet_tranche || "")} · SIRET ${esc(e.siret || "N/A")}</div>
+    <div class="field" style="display:flex; align-items:center; gap:8px;">
+      <input type="checkbox" id="d-e-spont" style="width:auto;" ${e.spontanee_recommandee ? "checked" : ""} />
+      <label for="d-e-spont" style="margin:0; cursor:pointer; color:#86efac;">&#127919; Cibler en candidature spontanée</label>
+    </div>
+    <div class="field"><label>Pourquoi candidater / Angle d'approche</label><input type="text" id="d-e-spont-raison" value="${esc(e.spontanee_raison || "")}" placeholder="ex: Cyber / Cloud souverain / stage 10-12 sem." /></div>
     <div class="field"><label>Activité / Ce qu'il faut savoir avant de contacter</label><textarea id="d-e-desc">${esc(e.description || "")}</textarea></div>
     <div class="field"><label>Statut candidature spontanée</label><select id="d-e-statut">${statusOptions(ENT_STATUTS, e.statut)}</select></div>
     <div class="field"><label>Priorité (1 = Top, 2 = Moyen, 3 = Secondaire)</label><input type="number" min="1" max="3" id="d-e-prio" value="${e.priorite || 2}" /></div>
@@ -927,7 +1096,11 @@ function openCompanyDrawer(id) {
 }
 
 async function saveCompanyDrawer(id) {
+  const existing = findCompanyById(id);
+  const spontChecked = document.getElementById("d-e-spont").checked;
   const payload = {
+    spontanee_recommandee: spontChecked,
+    spontanee_raison: document.getElementById("d-e-spont-raison").value,
     description: document.getElementById("d-e-desc").value,
     statut: document.getElementById("d-e-statut").value,
     priorite: Number(document.getElementById("d-e-prio").value) || 2,
@@ -939,10 +1112,13 @@ async function saveCompanyDrawer(id) {
     url_carrieres: document.getElementById("d-e-car").value,
     notes: document.getElementById("d-e-notes").value,
   };
+  if (spontChecked && existing && (existing.spontanee_score === null || existing.spontanee_score === undefined)) {
+    payload.spontanee_score = payload.priorite === 1 ? 85 : 75;
+  }
   await api(`/api/entreprises/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
   closeDrawer();
   showToast("Fiche entreprise enregistrée");
-  await Promise.all([loadEntreprises(), loadStats()]);
+  await Promise.all([loadSpontanees(), loadEntreprises(), loadStats()]);
 }
 
 function openNewOfferModal() {
@@ -1046,9 +1222,10 @@ function closeDropdowns() {
   document.querySelectorAll(".nav-dropdown").forEach(d => d.classList.remove("open"));
 }
 
-function setActiveSubtab(containerId, contract) {
+function setActiveSubtab(containerId, target) {
   document.querySelectorAll(`#${containerId} .subtab-btn`).forEach(b => {
-    b.classList.toggle("active", b.dataset.contract === contract);
+    const val = b.dataset.contract ?? b.dataset.zone ?? "";
+    b.classList.toggle("active", val === target);
   });
 }
 
@@ -1061,7 +1238,13 @@ function switchTab(tabName, customPath = null) {
   targetBtn.classList.add("active");
   targetPanel.classList.add("active");
   closeDropdowns();
-  const nextPath = customPath || (tabName === "selection" ? "/selection" : tabName === "offres" ? "/offres" : "/");
+  const nextPath = customPath || (
+    tabName === "selection" ? "/selection"
+      : tabName === "offres" ? "/offres"
+      : tabName === "spontanees" ? "/spontanees"
+      : tabName === "entreprises" ? "/entreprises"
+      : "/"
+  );
   if (window.location.pathname !== nextPath) {
     history.replaceState(null, "", nextPath);
   }
@@ -1096,6 +1279,14 @@ function openSelectionView(contract) {
   loadSelection();
 }
 
+function openSpontaneesView(zone) {
+  currentSpontZone = zone || "";
+  setActiveSubtab("spontanees-subtabs", currentSpontZone);
+  const path = currentSpontZone ? `/spontanees/${currentSpontZone}` : "/spontanees";
+  switchTab("spontanees", path);
+  loadSpontanees();
+}
+
 document.querySelectorAll(".tab-btn").forEach(btn => {
   btn.addEventListener("click", (e) => {
     const dd = btn.closest(".nav-dropdown");
@@ -1104,6 +1295,9 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
       if (dd && window.matchMedia("(hover: none)").matches) dd.classList.toggle("open");
     } else if (btn.dataset.tab === "selection") {
       openSelectionView(currentSelContract);
+      if (dd && window.matchMedia("(hover: none)").matches) dd.classList.toggle("open");
+    } else if (btn.dataset.tab === "spontanees") {
+      openSpontaneesView(currentSpontZone);
       if (dd && window.matchMedia("(hover: none)").matches) dd.classList.toggle("open");
     } else {
       switchTab(btn.dataset.tab);
@@ -1127,6 +1321,10 @@ document.getElementById("drawer-bg").addEventListener("click", e => {
   document.getElementById(id).addEventListener("input", () => loadSelection());
   document.getElementById(id).addEventListener("change", () => loadSelection());
 });
+["f-spont-q", "f-spont-score", "f-spont-trajet", "f-spont-lba", "f-spont-statut"].forEach(id => {
+  document.getElementById(id).addEventListener("input", () => loadSpontanees());
+  document.getElementById(id).addEventListener("change", () => loadSpontanees());
+});
 ["f-ent-q", "f-ent-zone", "f-ent-trajet", "f-ent-taille", "f-ent-lba", "f-ent-statut"].forEach(id => {
   document.getElementById(id).addEventListener("input", () => loadEntreprises());
   document.getElementById(id).addEventListener("change", () => loadEntreprises());
@@ -1142,7 +1340,7 @@ document.getElementById("btn-collect").addEventListener("click", async () => {
   try {
     const res = await api("/api/ui/collect-offers", { method: "POST" });
     showToast(`Collecte terminée (${res.run_summary.total_upserted || 0} offres traitées)`);
-    await Promise.all([loadStats(), loadOffres(), loadSelection(), loadEntreprises()]);
+    await Promise.all([loadStats(), loadOffres(), loadSelection(), loadSpontanees(), loadEntreprises()]);
   } catch (err) {
     showToast("Erreur collecte : " + err.message);
   } finally {
@@ -1174,9 +1372,20 @@ if (p === "/offres/stages") {
   switchTab("selection", p);
 } else if (p === "/selection" || window.location.hash === "#selection") {
   switchTab("selection", "/selection");
+} else if (p.startsWith("/spontanees/")) {
+  const z = p.replace("/spontanees/", "");
+  if (["loperhet", "lannion", "caen"].includes(z)) {
+    currentSpontZone = z;
+    setActiveSubtab("spontanees-subtabs", z);
+    switchTab("spontanees", p);
+  }
+} else if (p === "/spontanees") {
+  switchTab("spontanees", p);
+} else if (p === "/entreprises") {
+  switchTab("entreprises", p);
 }
 
-Promise.all([loadStats(), loadOffres(), loadSelection(), loadEntreprises()]).catch(err => showToast(err.message));
+Promise.all([loadStats(), loadOffres(), loadSelection(), loadSpontanees(), loadEntreprises()]).catch(err => showToast(err.message));
 </script>
 </body>
 </html>
