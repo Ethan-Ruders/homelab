@@ -45,6 +45,7 @@ class OfferCreate(BaseModel):
     date_relance: date | None = None
     contact_info: str | None = None
     notes: str | None = None
+    is_starred: bool = False
 
 
 class OfferPatch(BaseModel):
@@ -55,6 +56,7 @@ class OfferPatch(BaseModel):
     notes: str | None = None
     resume_ia: str | None = None
     entreprise_resume: str | None = None
+    is_starred: bool | None = None
 
 
 class CompanyCreate(BaseModel):
@@ -163,6 +165,11 @@ def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
+@app.get("/selection", response_class=HTMLResponse)
+def selection_page(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
+
+
 @app.get("/health")
 def health():
     with db_cursor(commit=False) as cur:
@@ -204,6 +211,11 @@ def get_stats():
         cur.execute("SELECT * FROM v_relances_a_faire LIMIT 50")
         relances = _serialize_dates([dict(r) for r in cur.fetchall()])
 
+        cur.execute(
+            "SELECT COUNT(*)::int AS cnt FROM offres WHERE is_starred = TRUE AND statut NOT IN ('Ignorée', 'Ignoré')"
+        )
+        offres_pointees = cur.fetchone()["cnt"]
+
         cur.execute("SELECT id, started_at, finished_at, type, status, summary FROM collectes ORDER BY id DESC LIMIT 1")
         row = cur.fetchone()
         last_collect = _serialize_dates([dict(row)])[0] if row else None
@@ -212,6 +224,7 @@ def get_stats():
         "offres_par_statut": offres_statut,
         "offres_par_zone": offres_zone,
         "offres_par_contrat": offres_contrat,
+        "offres_pointees": offres_pointees,
         "entreprises_par_zone": entreprises_zone,
         "relances": relances,
         "derniere_collecte": last_collect,
@@ -224,6 +237,7 @@ def list_offres(
     type_contrat: str | None = Query(default=None),
     statut: str | None = Query(default=None),
     score_min: int | None = Query(default=None),
+    starred: bool | None = Query(default=None),
     q: str | None = Query(default=None),
 ):
     where = ["1=1"]
@@ -242,6 +256,8 @@ def list_offres(
     if score_min is not None:
         where.append("COALESCE(o.score_ia, 0) >= %s")
         params.append(score_min)
+    if starred is True:
+        where.append("o.is_starred = TRUE")
     if q:
         where.append("(o.titre ILIKE %s OR o.entreprise_nom ILIKE %s OR COALESCE(o.ville,'') ILIKE %s OR COALESCE(o.resume_ia,'') ILIKE %s)")
         like = f"%{q.strip()}%"
@@ -253,8 +269,8 @@ def list_offres(
                o.titre, o.type_contrat, o.zone, o.ville,
                COALESCE(o.trajet_tranche, e.trajet_tranche) AS trajet_tranche,
                o.url_directe, o.description, o.date_publication, o.score_ia, o.domaine_ia,
-               o.resume_ia, o.statut, o.date_candidature, o.date_relance, o.contact_info,
-               o.notes, o.notified_at, o.created_at, o.updated_at,
+               o.resume_ia, o.statut, o.is_starred, o.date_candidature, o.date_relance,
+               o.contact_info, o.notes, o.notified_at, o.created_at, o.updated_at,
                e.taille_categorie, e.effectif_label, e.site_web, e.url_carrieres
         FROM offres o
         LEFT JOIN entreprises e ON e.id = o.entreprise_id
@@ -281,11 +297,11 @@ def create_offer(payload: OfferCreate):
             INSERT INTO offres (
                 source, external_id, dedup_hash, entreprise_id, entreprise_nom, entreprise_resume,
                 titre, type_contrat, zone, ville, trajet_tranche, url_directe, description,
-                date_publication, score_ia, statut, date_candidature, date_relance, contact_info, notes
+                date_publication, score_ia, statut, is_starred, date_candidature, date_relance, contact_info, notes
             )
             VALUES (
                 'manuel', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                CURRENT_DATE, 80, %s, %s, %s, %s, %s
+                CURRENT_DATE, 80, %s, %s, %s, %s, %s, %s
             )
             RETURNING *
             """,
@@ -303,6 +319,7 @@ def create_offer(payload: OfferCreate):
                 payload.url_directe.strip(),
                 payload.description,
                 payload.statut,
+                payload.is_starred,
                 payload.date_candidature,
                 payload.date_relance,
                 payload.contact_info,

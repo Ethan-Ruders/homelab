@@ -202,6 +202,27 @@
       color: #cbd5e1;
     }
     .row-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+    .star-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 8px;
+      width: 34px;
+      height: 32px;
+      font-size: 1.05rem;
+      line-height: 1;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+    }
+    .star-btn:hover { border-color: #facc15; color: #fde047; transform: scale(1.06); }
+    .star-btn.starred {
+      background: rgba(250, 204, 21, 0.14);
+      border-color: #facc15;
+      color: #facc15;
+    }
   </style>
 </head>
 <body>
@@ -215,6 +236,7 @@
   <div class="tabs">
     <button class="tab-btn active" data-tab="dashboard">Tableau de bord</button>
     <button class="tab-btn" data-tab="offres">Offres (<span id="tab-count-offres">0</span>)</button>
+    <button class="tab-btn" data-tab="selection">&#9733; Sélection (<span id="tab-count-sel">0</span>)</button>
     <button class="tab-btn" data-tab="entreprises">Entreprises (<span id="tab-count-ent">0</span>)</button>
   </div>
   <div class="nav-actions">
@@ -286,6 +308,7 @@
       <table>
         <thead>
           <tr>
+            <th>&#9733;</th>
             <th>Score</th>
             <th>Contrat</th>
             <th>Poste &amp; Résumé IA</th>
@@ -297,6 +320,54 @@
           </tr>
         </thead>
         <tbody id="offres-tbody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="panel-selection" class="panel">
+    <div class="filters">
+      <input type="search" id="f-sel-q" placeholder="Rechercher dans ma sélection..." />
+      <select id="f-sel-zone">
+        <option value="">Toutes zones</option>
+        <option value="loperhet">Loperhet / Brest</option>
+        <option value="lannion">Lannion</option>
+        <option value="caen">Caen</option>
+      </select>
+      <select id="f-sel-contrat">
+        <option value="">Stage + Alternance</option>
+        <option value="stage">Stage été</option>
+        <option value="alternance">Alternance 2 ans</option>
+      </select>
+      <select id="f-sel-statut">
+        <option value="">Actives (hors ignorées)</option>
+        <option value="À voir">À voir</option>
+        <option value="À postuler">À postuler</option>
+        <option value="Postulée">Postulée</option>
+        <option value="Relancée">Relancée</option>
+        <option value="Entretien">Entretien</option>
+        <option value="En attente">En attente</option>
+        <option value="Accepté">Accepté</option>
+        <option value="Refusée">Refusée</option>
+        <option value="Ignorée">Ignorée</option>
+      </select>
+      <span class="muted">Clique sur &#9734; / &#9733; dans <strong>Offres</strong> ou ici pour ajouter ou retirer une offre de ta sélection.</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>&#9733;</th>
+            <th>Score</th>
+            <th>Contrat</th>
+            <th>Poste &amp; Résumé IA</th>
+            <th>Entreprise &amp; Activité</th>
+            <th>Zone / Trajet</th>
+            <th>Statut</th>
+            <th>Suivi</th>
+            <th>Lien direct</th>
+          </tr>
+        </thead>
+        <tbody id="selection-tbody"></tbody>
       </table>
     </div>
   </section>
@@ -370,6 +441,7 @@ const ENT_STATUTS = ["Non contactée", "À contacter", "Contactée", "Relancée"
 const ZONE_LABELS = { loperhet: "Loperhet / Brest", lannion: "Lannion", caen: "Caen" };
 
 let offersCache = [];
+let starredCache = [];
 let companiesCache = [];
 
 function esc(s) {
@@ -415,7 +487,7 @@ async function loadStats() {
   const grandsEnt = st.entreprises_par_zone.reduce((a, b) => a + b.grands_acteurs, 0);
 
   document.getElementById("kpi-cards").innerHTML = `
-    <div class="card"><h3>Offres actives</h3><div class="kpi-val">${totalOffres}</div><div class="kpi-sub">À voir : ${byStat["À voir"] || 0} · À postuler : ${byStat["À postuler"] || 0} · Ignorées : ${ignoredCount}</div></div>
+    <div class="card"><h3>Offres actives</h3><div class="kpi-val">${totalOffres}</div><div class="kpi-sub">À voir : ${byStat["À voir"] || 0} · &#9733; Sélectionnées : <a href="/selection" onclick="event.preventDefault(); switchTab('selection');">${st.offres_pointees || 0}</a> · Ignorées : ${ignoredCount}</div></div>
     <div class="card"><h3>Candidatures actives</h3><div class="kpi-val">${(byStat["Postulée"] || 0) + (byStat["Relancée"] || 0) + (byStat["En attente"] || 0)}</div><div class="kpi-sub">Entretiens : ${byStat["Entretien"] || 0} · Acceptées : ${byStat["Accepté"] || 0}</div></div>
     <div class="card"><h3>Entreprises (&le; 30 min)</h3><div class="kpi-val">${totalEnt}</div><div class="kpi-sub">Grands groupes &amp; ETI : ${grandsEnt}</div></div>
     <div class="card"><h3>Relances &ge; 10j</h3><div class="kpi-val" style="color:${st.relances.length ? '#f59e0b' : '#22c55e'}">${st.relances.length}</div><div class="kpi-sub">Candidatures sans réponse &gt; 10 jours</div></div>
@@ -449,24 +521,15 @@ async function loadStats() {
     : "Aucune collecte enregistrée.";
 }
 
-async function loadOffres() {
-  const params = new URLSearchParams();
-  const q = document.getElementById("f-offres-q").value.trim();
-  const zone = document.getElementById("f-offres-zone").value;
-  const contrat = document.getElementById("f-offres-contrat").value;
-  const statut = document.getElementById("f-offres-statut").value;
-  const scoreMin = document.getElementById("f-offres-score").value;
-  if (q) params.set("q", q);
-  if (zone) params.set("zone", zone);
-  if (contrat) params.set("type_contrat", contrat);
-  if (statut) params.set("statut", statut);
-  if (scoreMin) params.set("score_min", scoreMin);
-
-  offersCache = await api(`/api/offres?${params.toString()}`);
-  document.getElementById("tab-count-offres").textContent = offersCache.length;
-
-  document.getElementById("offres-tbody").innerHTML = offersCache.map(o => `
+function renderOfferRow(o) {
+  const starred = Boolean(o.is_starred);
+  return `
     <tr>
+      <td>
+        <button class="star-btn ${starred ? 'starred' : ''}" title="${starred ? 'Retirer de ma sélection' : 'Pointer / Ajouter à ma sélection'}" onclick="toggleOfferStar(${o.id}, ${!starred})">
+          ${starred ? '&#9733;' : '&#9734;'}
+        </button>
+      </td>
       <td>${scoreBadge(o.score_ia)}<div class="muted" style="margin-top:4px;">${esc(o.domaine_ia || o.source)}</div></td>
       <td><span class="badge ${o.type_contrat === 'stage' ? 'b-stage' : 'b-alt'}">${o.type_contrat === 'stage' ? 'STAGE ÉTÉ' : 'ALTERNANCE'}</span></td>
       <td>
@@ -497,7 +560,43 @@ async function loadOffres() {
         </div>
       </td>
     </tr>
-  `).join("") || `<tr><td colspan="8" class="muted">Aucune offre correspondante.</td></tr>`;
+  `;
+}
+
+async function loadOffres() {
+  const params = new URLSearchParams();
+  const q = document.getElementById("f-offres-q").value.trim();
+  const zone = document.getElementById("f-offres-zone").value;
+  const contrat = document.getElementById("f-offres-contrat").value;
+  const statut = document.getElementById("f-offres-statut").value;
+  const scoreMin = document.getElementById("f-offres-score").value;
+  if (q) params.set("q", q);
+  if (zone) params.set("zone", zone);
+  if (contrat) params.set("type_contrat", contrat);
+  if (statut) params.set("statut", statut);
+  if (scoreMin) params.set("score_min", scoreMin);
+
+  offersCache = await api(`/api/offres?${params.toString()}`);
+  document.getElementById("tab-count-offres").textContent = offersCache.length;
+
+  document.getElementById("offres-tbody").innerHTML = offersCache.map(renderOfferRow).join("") || `<tr><td colspan="9" class="muted">Aucune offre correspondante.</td></tr>`;
+}
+
+async function loadSelection() {
+  const params = new URLSearchParams({ starred: "true" });
+  const q = document.getElementById("f-sel-q").value.trim();
+  const zone = document.getElementById("f-sel-zone").value;
+  const contrat = document.getElementById("f-sel-contrat").value;
+  const statut = document.getElementById("f-sel-statut").value;
+  if (q) params.set("q", q);
+  if (zone) params.set("zone", zone);
+  if (contrat) params.set("type_contrat", contrat);
+  if (statut) params.set("statut", statut);
+
+  starredCache = await api(`/api/offres?${params.toString()}`);
+  document.getElementById("tab-count-sel").textContent = starredCache.length;
+
+  document.getElementById("selection-tbody").innerHTML = starredCache.map(renderOfferRow).join("") || `<tr><td colspan="9" class="muted">Aucune offre pointée pour l'instant. Clique sur l'étoile &#9734; dans l'onglet Offres pour ajouter des offres à ta sélection.</td></tr>`;
 }
 
 async function loadEntreprises() {
@@ -556,6 +655,16 @@ async function loadEntreprises() {
   `).join("") || `<tr><td colspan="8" class="muted">Aucune entreprise trouvée.</td></tr>`;
 }
 
+function findOfferById(id) {
+  return offersCache.find(x => x.id === id) || starredCache.find(x => x.id === id);
+}
+
+async function toggleOfferStar(id, is_starred) {
+  await api(`/api/offres/${id}`, { method: "PATCH", body: JSON.stringify({ is_starred }) });
+  showToast(is_starred ? `Offre #${id} ajoutée à ★ Sélection` : `Offre #${id} retirée de ★ Sélection`);
+  await Promise.all([loadOffres(), loadSelection(), loadStats()]);
+}
+
 async function quickOfferStatus(id, statut) {
   const payload = { statut };
   if (["Postulée", "Contactée"].includes(statut)) {
@@ -563,7 +672,7 @@ async function quickOfferStatus(id, statut) {
   }
   await api(`/api/offres/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
   showToast(`Offre #${id} → ${statut}`);
-  loadStats();
+  await Promise.all([loadStats(), loadSelection()]);
 }
 
 async function quickCompanyStatus(id, statut) {
@@ -581,7 +690,7 @@ function closeDrawer() {
 }
 
 function openOfferDrawer(id) {
-  const o = offersCache.find(x => x.id === id);
+  const o = findOfferById(id);
   if (!o) return;
   document.getElementById("drawer-content").innerHTML = `
     <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -589,6 +698,10 @@ function openOfferDrawer(id) {
       <button class="btn" onclick="closeDrawer()">Fermer</button>
     </div>
     <div class="muted">${esc(o.entreprise_nom)} · ${esc(o.ville || "")} (${esc(o.zone)}) · <a href="${esc(o.url_directe)}" target="_blank" rel="noopener">Ouvrir l'annonce ↗</a></div>
+    <div class="field" style="display:flex; align-items:center; gap:8px;">
+      <input type="checkbox" id="d-o-starred" style="width:auto;" ${o.is_starred ? "checked" : ""} />
+      <label for="d-o-starred" style="margin:0; cursor:pointer; color:#facc15;">&#9733; Pointée dans ma sélection</label>
+    </div>
     <div class="field"><label>Ce que fait l'entreprise</label><textarea id="d-o-eresume">${esc(o.entreprise_resume || "")}</textarea></div>
     <div class="field"><label>Résumé IA</label><textarea id="d-o-resume">${esc(o.resume_ia || "")}</textarea></div>
     <div class="field"><label>Statut</label><select id="d-o-statut">${statusOptions(OFFER_STATUTS, o.statut)}</select></div>
@@ -606,6 +719,7 @@ function openOfferDrawer(id) {
 
 async function saveOfferDrawer(id) {
   const payload = {
+    is_starred: document.getElementById("d-o-starred").checked,
     entreprise_resume: document.getElementById("d-o-eresume").value,
     resume_ia: document.getElementById("d-o-resume").value,
     statut: document.getElementById("d-o-statut").value,
@@ -617,7 +731,7 @@ async function saveOfferDrawer(id) {
   await api(`/api/offres/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
   closeDrawer();
   showToast("Fiche offre enregistrée");
-  await Promise.all([loadOffres(), loadStats()]);
+  await Promise.all([loadOffres(), loadSelection(), loadStats()]);
 }
 
 function openCompanyDrawer(id) {
@@ -698,7 +812,7 @@ async function submitNewOffer() {
   await api("/api/offres", { method: "POST", body: JSON.stringify(payload) });
   closeDrawer();
   showToast("Offre ajoutée");
-  await Promise.all([loadOffres(), loadStats()]);
+  await Promise.all([loadOffres(), loadSelection(), loadStats()]);
 }
 
 function openNewCompanyModal() {
@@ -739,13 +853,22 @@ async function submitNewCompany() {
   await Promise.all([loadEntreprises(), loadStats()]);
 }
 
+function switchTab(tabName) {
+  const targetBtn = document.querySelector(`.tab-btn[data-tab="${tabName}"]`);
+  const targetPanel = document.getElementById(`panel-${tabName}`);
+  if (!targetBtn || !targetPanel) return;
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+  document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+  targetBtn.classList.add("active");
+  targetPanel.classList.add("active");
+  const nextPath = tabName === "selection" ? "/selection" : "/";
+  if (window.location.pathname !== nextPath) {
+    history.replaceState(null, "", nextPath);
+  }
+}
+
 document.querySelectorAll(".tab-btn").forEach(btn => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-    document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
-    btn.classList.add("active");
-    document.getElementById(`panel-${btn.dataset.tab}`).classList.add("active");
-  });
+  btn.addEventListener("click", () => switchTab(btn.dataset.tab));
 });
 
 document.getElementById("drawer-bg").addEventListener("click", e => {
@@ -755,6 +878,10 @@ document.getElementById("drawer-bg").addEventListener("click", e => {
 ["f-offres-q", "f-offres-zone", "f-offres-contrat", "f-offres-statut", "f-offres-score"].forEach(id => {
   document.getElementById(id).addEventListener("input", () => loadOffres());
   document.getElementById(id).addEventListener("change", () => loadOffres());
+});
+["f-sel-q", "f-sel-zone", "f-sel-contrat", "f-sel-statut"].forEach(id => {
+  document.getElementById(id).addEventListener("input", () => loadSelection());
+  document.getElementById(id).addEventListener("change", () => loadSelection());
 });
 ["f-ent-q", "f-ent-zone", "f-ent-trajet", "f-ent-taille", "f-ent-lba", "f-ent-statut"].forEach(id => {
   document.getElementById(id).addEventListener("input", () => loadEntreprises());
@@ -771,7 +898,7 @@ document.getElementById("btn-collect").addEventListener("click", async () => {
   try {
     const res = await api("/api/ui/collect-offers", { method: "POST" });
     showToast(`Collecte terminée (${res.run_summary.total_upserted || 0} offres traitées)`);
-    await Promise.all([loadStats(), loadOffres(), loadEntreprises()]);
+    await Promise.all([loadStats(), loadOffres(), loadSelection(), loadEntreprises()]);
   } catch (err) {
     showToast("Erreur collecte : " + err.message);
   } finally {
@@ -780,7 +907,11 @@ document.getElementById("btn-collect").addEventListener("click", async () => {
   }
 });
 
-Promise.all([loadStats(), loadOffres(), loadEntreprises()]).catch(err => showToast(err.message));
+if (window.location.pathname === "/selection" || window.location.hash === "#selection") {
+  switchTab("selection");
+}
+
+Promise.all([loadStats(), loadOffres(), loadSelection(), loadEntreprises()]).catch(err => showToast(err.message));
 </script>
 </body>
 </html>

@@ -77,6 +77,7 @@ CREATE TABLE IF NOT EXISTS offres (
     date_relance DATE,
     contact_info TEXT,
     notes TEXT,
+    is_starred BOOLEAN NOT NULL DEFAULT FALSE,
     notified_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -87,6 +88,7 @@ CREATE INDEX IF NOT EXISTS idx_offres_zone_statut_score ON offres (zone, statut,
 CREATE INDEX IF NOT EXISTS idx_offres_notified_at ON offres (notified_at);
 CREATE INDEX IF NOT EXISTS idx_offres_dedup_hash ON offres (dedup_hash);
 CREATE INDEX IF NOT EXISTS idx_offres_entreprise_id ON offres (entreprise_id);
+CREATE INDEX IF NOT EXISTS idx_offres_starred ON offres (is_starred) WHERE is_starred = TRUE;
 
 CREATE TABLE IF NOT EXISTS collectes (
     id SERIAL PRIMARY KEY,
