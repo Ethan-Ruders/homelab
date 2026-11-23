@@ -115,12 +115,23 @@ def _detect_zone_and_trajet(
 
 
 def _classify_contract(title: str, raw_types: str = "") -> str | None:
-    t = _norm(f"{title} {raw_types}")
-    has_alt = any(k in t for k in ("ALTERNAN", "APPRENTI", "CONTRAT PRO", "PROFESSIONNALISATION"))
-    has_stage = any(k in t for k in ("STAGE", "STAGIAIRE", "INTERNSHIP", " INTERN "))
-    if has_alt:
+    alt_keys = ("ALTERNAN", "APPRENTI", "CONTRAT PRO", "PROFESSIONNALISATION")
+    stage_keys = ("STAGE", "STAGIAIRE", "INTERNSHIP", " INTERN ")
+
+    t_title = _norm(title)
+    title_alt = any(k in t_title for k in alt_keys)
+    title_stage = any(k in t_title for k in stage_keys)
+    if title_alt and not title_stage:
         return "alternance"
-    if has_stage:
+    if title_stage and not title_alt:
+        return "stage"
+    if title_alt and title_stage:
+        return "alternance"
+
+    t_all = _norm(f"{title} {raw_types}")
+    if any(k in t_all for k in alt_keys):
+        return "alternance"
+    if any(k in t_all for k in stage_keys):
         return "stage"
     return None
 

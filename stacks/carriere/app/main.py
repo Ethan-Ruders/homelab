@@ -161,12 +161,13 @@ def _serialize_dates(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 @app.get("/", response_class=HTMLResponse)
-def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
-
-
+@app.get("/offres", response_class=HTMLResponse)
+@app.get("/offres/stages", response_class=HTMLResponse)
+@app.get("/offres/alternances", response_class=HTMLResponse)
 @app.get("/selection", response_class=HTMLResponse)
-def selection_page(request: Request):
+@app.get("/selection/stages", response_class=HTMLResponse)
+@app.get("/selection/alternances", response_class=HTMLResponse)
+def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
@@ -189,8 +190,15 @@ def get_stats():
         cur.execute("SELECT zone, COUNT(*)::int AS total FROM offres GROUP BY zone ORDER BY zone")
         offres_zone = [dict(r) for r in cur.fetchall()]
 
-        cur.execute("SELECT type_contrat, COUNT(*)::int AS total FROM offres GROUP BY type_contrat ORDER BY type_contrat")
+        cur.execute(
+            "SELECT type_contrat, COUNT(*)::int AS total FROM offres WHERE statut NOT IN ('Ignorée', 'Ignoré') GROUP BY type_contrat ORDER BY type_contrat"
+        )
         offres_contrat = [dict(r) for r in cur.fetchall()]
+
+        cur.execute(
+            "SELECT type_contrat, COUNT(*)::int AS total FROM offres WHERE is_starred = TRUE AND statut NOT IN ('Ignorée', 'Ignoré') GROUP BY type_contrat ORDER BY type_contrat"
+        )
+        selection_contrat = [dict(r) for r in cur.fetchall()]
 
         cur.execute(
             """
@@ -224,6 +232,7 @@ def get_stats():
         "offres_par_statut": offres_statut,
         "offres_par_zone": offres_zone,
         "offres_par_contrat": offres_contrat,
+        "selection_par_contrat": selection_contrat,
         "offres_pointees": offres_pointees,
         "entreprises_par_zone": entreprises_zone,
         "relances": relances,

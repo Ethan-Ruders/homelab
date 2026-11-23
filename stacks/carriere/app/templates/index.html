@@ -47,7 +47,7 @@
     .brand h1 { margin: 0; font-size: 1.15rem; font-weight: 700; letter-spacing: -0.01em; }
     .brand span { font-size: 0.78rem; color: var(--muted); }
     .nav-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-    .tabs { display: flex; gap: 6px; background: var(--surface); padding: 4px; border-radius: 10px; border: 1px solid var(--border); }
+    .tabs { display: flex; gap: 6px; background: var(--surface); padding: 4px; border-radius: 10px; border: 1px solid var(--border); position: relative; }
     .tab-btn {
       background: transparent;
       border: none;
@@ -59,6 +59,58 @@
       cursor: pointer;
     }
     .tab-btn.active { background: var(--accent2); color: #fff; }
+    .nav-dropdown { position: relative; display: inline-flex; }
+    .dropdown-menu {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      min-width: 230px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 6px;
+      box-shadow: 0 12px 30px rgba(2, 6, 23, 0.55);
+      display: none;
+      flex-direction: column;
+      gap: 4px;
+      z-index: 45;
+    }
+    .nav-dropdown:hover .dropdown-menu,
+    .nav-dropdown.open .dropdown-menu { display: flex; }
+    .dropdown-item {
+      background: transparent;
+      border: none;
+      color: var(--text);
+      text-align: left;
+      padding: 8px 10px;
+      border-radius: 7px;
+      font-size: 0.86rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+    .dropdown-item:hover { background: rgba(99, 102, 241, 0.22); }
+    .subtabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .subtab-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 7px 14px;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .subtab-btn:hover { border-color: var(--accent); color: var(--text); }
+    .subtab-btn.active { background: var(--accent2); border-color: var(--accent2); color: #fff; }
     .btn {
       background: var(--surface2);
       border: 1px solid var(--border);
@@ -235,8 +287,22 @@
   </div>
   <div class="tabs">
     <button class="tab-btn active" data-tab="dashboard">Tableau de bord</button>
-    <button class="tab-btn" data-tab="offres">Offres (<span id="tab-count-offres">0</span>)</button>
-    <button class="tab-btn" data-tab="selection">&#9733; Sélection (<span id="tab-count-sel">0</span>)</button>
+    <div class="nav-dropdown" id="dd-offres">
+      <button class="tab-btn" data-tab="offres">Offres (<span id="tab-count-offres">0</span>) &#9662;</button>
+      <div class="dropdown-menu">
+        <button class="dropdown-item" onclick="openOffersView('stage')"><span>Stages été 2027</span><span class="badge b-stage" id="dd-offres-stage">0</span></button>
+        <button class="dropdown-item" onclick="openOffersView('alternance')"><span>Alternances 2 ans</span><span class="badge b-alt" id="dd-offres-alt">0</span></button>
+        <button class="dropdown-item" onclick="openOffersView('')"><span>Toutes les offres</span><span class="badge b-zone" id="dd-offres-all">0</span></button>
+      </div>
+    </div>
+    <div class="nav-dropdown" id="dd-selection">
+      <button class="tab-btn" data-tab="selection">&#9733; Sélection (<span id="tab-count-sel">0</span>) &#9662;</button>
+      <div class="dropdown-menu">
+        <button class="dropdown-item" onclick="openSelectionView('stage')"><span>Stages sélectionnés</span><span class="badge b-stage" id="dd-sel-stage">0</span></button>
+        <button class="dropdown-item" onclick="openSelectionView('alternance')"><span>Alternances sélectionnées</span><span class="badge b-alt" id="dd-sel-alt">0</span></button>
+        <button class="dropdown-item" onclick="openSelectionView('')"><span>Toute ma sélection</span><span class="badge b-zone" id="dd-sel-all">0</span></button>
+      </div>
+    </div>
     <button class="tab-btn" data-tab="entreprises">Entreprises (<span id="tab-count-ent">0</span>)</button>
   </div>
   <div class="nav-actions">
@@ -272,6 +338,11 @@
   </section>
 
   <section id="panel-offres" class="panel">
+    <div class="subtabs" id="offres-subtabs">
+      <button class="subtab-btn active" data-contract="" onclick="openOffersView('')">Toutes (<span id="sub-offres-all">0</span>)</button>
+      <button class="subtab-btn" data-contract="stage" onclick="openOffersView('stage')">Stages été 2027 (<span id="sub-offres-stage">0</span>)</button>
+      <button class="subtab-btn" data-contract="alternance" onclick="openOffersView('alternance')">Alternances 2 ans (<span id="sub-offres-alt">0</span>)</button>
+    </div>
     <div class="filters">
       <input type="search" id="f-offres-q" placeholder="Rechercher poste, entreprise, ville, compétence..." />
       <select id="f-offres-zone">
@@ -279,11 +350,6 @@
         <option value="loperhet">Loperhet / Brest</option>
         <option value="lannion">Lannion</option>
         <option value="caen">Caen</option>
-      </select>
-      <select id="f-offres-contrat">
-        <option value="">Stage + Alternance</option>
-        <option value="stage">Stage été</option>
-        <option value="alternance">Alternance 2 ans</option>
       </select>
       <select id="f-offres-statut">
         <option value="">Actives (hors ignorées)</option>
@@ -325,6 +391,11 @@
   </section>
 
   <section id="panel-selection" class="panel">
+    <div class="subtabs" id="selection-subtabs">
+      <button class="subtab-btn active" data-contract="" onclick="openSelectionView('')">Toute ma sélection (<span id="sub-sel-all">0</span>)</button>
+      <button class="subtab-btn" data-contract="stage" onclick="openSelectionView('stage')">Stages sélectionnés (<span id="sub-sel-stage">0</span>)</button>
+      <button class="subtab-btn" data-contract="alternance" onclick="openSelectionView('alternance')">Alternances sélectionnées (<span id="sub-sel-alt">0</span>)</button>
+    </div>
     <div class="filters">
       <input type="search" id="f-sel-q" placeholder="Rechercher dans ma sélection..." />
       <select id="f-sel-zone">
@@ -332,11 +403,6 @@
         <option value="loperhet">Loperhet / Brest</option>
         <option value="lannion">Lannion</option>
         <option value="caen">Caen</option>
-      </select>
-      <select id="f-sel-contrat">
-        <option value="">Stage + Alternance</option>
-        <option value="stage">Stage été</option>
-        <option value="alternance">Alternance 2 ans</option>
       </select>
       <select id="f-sel-statut">
         <option value="">Actives (hors ignorées)</option>
@@ -443,6 +509,8 @@ const ZONE_LABELS = { loperhet: "Loperhet / Brest", lannion: "Lannion", caen: "C
 let offersCache = [];
 let starredCache = [];
 let companiesCache = [];
+let currentOfferContract = "";
+let currentSelContract = "";
 
 function esc(s) {
   return String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
@@ -483,11 +551,34 @@ async function loadStats() {
   const byStat = Object.fromEntries(st.offres_par_statut.map(x => [x.statut, x.total]));
   const ignoredCount = (byStat["Ignorée"] || 0) + (byStat["Ignoré"] || 0);
   const totalOffres = st.offres_par_statut.reduce((a, b) => a + b.total, 0) - ignoredCount;
+  const byContrat = Object.fromEntries((st.offres_par_contrat || []).map(x => [x.type_contrat, x.total]));
+  const stageCnt = byContrat["stage"] || 0;
+  const altCnt = byContrat["alternance"] || 0;
+  const selByContrat = Object.fromEntries((st.selection_par_contrat || []).map(x => [x.type_contrat, x.total]));
+  const selStageCnt = selByContrat["stage"] || 0;
+  const selAltCnt = selByContrat["alternance"] || 0;
+  const selAllCnt = st.offres_pointees || 0;
   const totalEnt = st.entreprises_par_zone.reduce((a, b) => a + b.total, 0);
   const grandsEnt = st.entreprises_par_zone.reduce((a, b) => a + b.grands_acteurs, 0);
 
+  document.getElementById("tab-count-offres").textContent = totalOffres;
+  document.getElementById("dd-offres-all").textContent = totalOffres;
+  document.getElementById("dd-offres-stage").textContent = stageCnt;
+  document.getElementById("dd-offres-alt").textContent = altCnt;
+  document.getElementById("sub-offres-all").textContent = totalOffres;
+  document.getElementById("sub-offres-stage").textContent = stageCnt;
+  document.getElementById("sub-offres-alt").textContent = altCnt;
+
+  document.getElementById("tab-count-sel").textContent = selAllCnt;
+  document.getElementById("dd-sel-all").textContent = selAllCnt;
+  document.getElementById("dd-sel-stage").textContent = selStageCnt;
+  document.getElementById("dd-sel-alt").textContent = selAltCnt;
+  document.getElementById("sub-sel-all").textContent = selAllCnt;
+  document.getElementById("sub-sel-stage").textContent = selStageCnt;
+  document.getElementById("sub-sel-alt").textContent = selAltCnt;
+
   document.getElementById("kpi-cards").innerHTML = `
-    <div class="card"><h3>Offres actives</h3><div class="kpi-val">${totalOffres}</div><div class="kpi-sub">À voir : ${byStat["À voir"] || 0} · &#9733; Sélectionnées : <a href="/selection" onclick="event.preventDefault(); switchTab('selection');">${st.offres_pointees || 0}</a> · Ignorées : ${ignoredCount}</div></div>
+    <div class="card"><h3>Offres actives</h3><div class="kpi-val">${totalOffres}</div><div class="kpi-sub"><a href="/offres/stages" onclick="event.preventDefault(); openOffersView('stage');">Stages : ${stageCnt}</a> · <a href="/offres/alternances" onclick="event.preventDefault(); openOffersView('alternance');">Alternances : ${altCnt}</a> · <a href="/selection" onclick="event.preventDefault(); openSelectionView('');">&#9733; ${selAllCnt}</a></div></div>
     <div class="card"><h3>Candidatures actives</h3><div class="kpi-val">${(byStat["Postulée"] || 0) + (byStat["Relancée"] || 0) + (byStat["En attente"] || 0)}</div><div class="kpi-sub">Entretiens : ${byStat["Entretien"] || 0} · Acceptées : ${byStat["Accepté"] || 0}</div></div>
     <div class="card"><h3>Entreprises (&le; 30 min)</h3><div class="kpi-val">${totalEnt}</div><div class="kpi-sub">Grands groupes &amp; ETI : ${grandsEnt}</div></div>
     <div class="card"><h3>Relances &ge; 10j</h3><div class="kpi-val" style="color:${st.relances.length ? '#f59e0b' : '#22c55e'}">${st.relances.length}</div><div class="kpi-sub">Candidatures sans réponse &gt; 10 jours</div></div>
@@ -567,7 +658,7 @@ async function loadOffres() {
   const params = new URLSearchParams();
   const q = document.getElementById("f-offres-q").value.trim();
   const zone = document.getElementById("f-offres-zone").value;
-  const contrat = document.getElementById("f-offres-contrat").value;
+  const contrat = currentOfferContract;
   const statut = document.getElementById("f-offres-statut").value;
   const scoreMin = document.getElementById("f-offres-score").value;
   if (q) params.set("q", q);
@@ -577,16 +668,15 @@ async function loadOffres() {
   if (scoreMin) params.set("score_min", scoreMin);
 
   offersCache = await api(`/api/offres?${params.toString()}`);
-  document.getElementById("tab-count-offres").textContent = offersCache.length;
 
-  document.getElementById("offres-tbody").innerHTML = offersCache.map(renderOfferRow).join("") || `<tr><td colspan="9" class="muted">Aucune offre correspondante.</td></tr>`;
+  document.getElementById("offres-tbody").innerHTML = offersCache.map(renderOfferRow).join("") || `<tr><td colspan="9" class="muted">Aucune offre correspondante dans cette catégorie.</td></tr>`;
 }
 
 async function loadSelection() {
   const params = new URLSearchParams({ starred: "true" });
   const q = document.getElementById("f-sel-q").value.trim();
   const zone = document.getElementById("f-sel-zone").value;
-  const contrat = document.getElementById("f-sel-contrat").value;
+  const contrat = currentSelContract;
   const statut = document.getElementById("f-sel-statut").value;
   if (q) params.set("q", q);
   if (zone) params.set("zone", zone);
@@ -594,9 +684,8 @@ async function loadSelection() {
   if (statut) params.set("statut", statut);
 
   starredCache = await api(`/api/offres?${params.toString()}`);
-  document.getElementById("tab-count-sel").textContent = starredCache.length;
 
-  document.getElementById("selection-tbody").innerHTML = starredCache.map(renderOfferRow).join("") || `<tr><td colspan="9" class="muted">Aucune offre pointée pour l'instant. Clique sur l'étoile &#9734; dans l'onglet Offres pour ajouter des offres à ta sélection.</td></tr>`;
+  document.getElementById("selection-tbody").innerHTML = starredCache.map(renderOfferRow).join("") || `<tr><td colspan="9" class="muted">Aucune offre pointée dans cette catégorie. Clique sur l'étoile &#9734; dans l'onglet Offres pour ajouter des offres à ta sélection.</td></tr>`;
 }
 
 async function loadEntreprises() {
@@ -853,7 +942,17 @@ async function submitNewCompany() {
   await Promise.all([loadEntreprises(), loadStats()]);
 }
 
-function switchTab(tabName) {
+function closeDropdowns() {
+  document.querySelectorAll(".nav-dropdown").forEach(d => d.classList.remove("open"));
+}
+
+function setActiveSubtab(containerId, contract) {
+  document.querySelectorAll(`#${containerId} .subtab-btn`).forEach(b => {
+    b.classList.toggle("active", b.dataset.contract === contract);
+  });
+}
+
+function switchTab(tabName, customPath = null) {
   const targetBtn = document.querySelector(`.tab-btn[data-tab="${tabName}"]`);
   const targetPanel = document.getElementById(`panel-${tabName}`);
   if (!targetBtn || !targetPanel) return;
@@ -861,25 +960,57 @@ function switchTab(tabName) {
   document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
   targetBtn.classList.add("active");
   targetPanel.classList.add("active");
-  const nextPath = tabName === "selection" ? "/selection" : "/";
+  closeDropdowns();
+  const nextPath = customPath || (tabName === "selection" ? "/selection" : tabName === "offres" ? "/offres" : "/");
   if (window.location.pathname !== nextPath) {
     history.replaceState(null, "", nextPath);
   }
 }
 
+function openOffersView(contract) {
+  currentOfferContract = contract || "";
+  setActiveSubtab("offres-subtabs", currentOfferContract);
+  const path = currentOfferContract === "stage" ? "/offres/stages" : currentOfferContract === "alternance" ? "/offres/alternances" : "/offres";
+  switchTab("offres", path);
+  loadOffres();
+}
+
+function openSelectionView(contract) {
+  currentSelContract = contract || "";
+  setActiveSubtab("selection-subtabs", currentSelContract);
+  const path = currentSelContract === "stage" ? "/selection/stages" : currentSelContract === "alternance" ? "/selection/alternances" : "/selection";
+  switchTab("selection", path);
+  loadSelection();
+}
+
 document.querySelectorAll(".tab-btn").forEach(btn => {
-  btn.addEventListener("click", () => switchTab(btn.dataset.tab));
+  btn.addEventListener("click", (e) => {
+    const dd = btn.closest(".nav-dropdown");
+    if (btn.dataset.tab === "offres") {
+      openOffersView(currentOfferContract);
+      if (dd && window.matchMedia("(hover: none)").matches) dd.classList.toggle("open");
+    } else if (btn.dataset.tab === "selection") {
+      openSelectionView(currentSelContract);
+      if (dd && window.matchMedia("(hover: none)").matches) dd.classList.toggle("open");
+    } else {
+      switchTab(btn.dataset.tab);
+    }
+  });
+});
+
+document.addEventListener("click", (e) => {
+  if (!e.target.closest(".nav-dropdown")) closeDropdowns();
 });
 
 document.getElementById("drawer-bg").addEventListener("click", e => {
   if (e.target.id === "drawer-bg") closeDrawer();
 });
 
-["f-offres-q", "f-offres-zone", "f-offres-contrat", "f-offres-statut", "f-offres-score"].forEach(id => {
+["f-offres-q", "f-offres-zone", "f-offres-statut", "f-offres-score"].forEach(id => {
   document.getElementById(id).addEventListener("input", () => loadOffres());
   document.getElementById(id).addEventListener("change", () => loadOffres());
 });
-["f-sel-q", "f-sel-zone", "f-sel-contrat", "f-sel-statut"].forEach(id => {
+["f-sel-q", "f-sel-zone", "f-sel-statut"].forEach(id => {
   document.getElementById(id).addEventListener("input", () => loadSelection());
   document.getElementById(id).addEventListener("change", () => loadSelection());
 });
@@ -907,8 +1038,27 @@ document.getElementById("btn-collect").addEventListener("click", async () => {
   }
 });
 
-if (window.location.pathname === "/selection" || window.location.hash === "#selection") {
-  switchTab("selection");
+const p = window.location.pathname;
+if (p === "/offres/stages") {
+  currentOfferContract = "stage";
+  setActiveSubtab("offres-subtabs", "stage");
+  switchTab("offres", p);
+} else if (p === "/offres/alternances") {
+  currentOfferContract = "alternance";
+  setActiveSubtab("offres-subtabs", "alternance");
+  switchTab("offres", p);
+} else if (p === "/offres") {
+  switchTab("offres", p);
+} else if (p === "/selection/stages") {
+  currentSelContract = "stage";
+  setActiveSubtab("selection-subtabs", "stage");
+  switchTab("selection", p);
+} else if (p === "/selection/alternances") {
+  currentSelContract = "alternance";
+  setActiveSubtab("selection-subtabs", "alternance");
+  switchTab("selection", p);
+} else if (p === "/selection" || window.location.hash === "#selection") {
+  switchTab("selection", "/selection");
 }
 
 Promise.all([loadStats(), loadOffres(), loadSelection(), loadEntreprises()]).catch(err => showToast(err.message));
