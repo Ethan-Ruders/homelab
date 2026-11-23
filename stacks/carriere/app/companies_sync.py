@@ -384,6 +384,7 @@ SPONTANEOUS_EXCLUDE_PATTERNS: tuple[str, ...] = (
     r"SOGELINK",
 )
 _SPONTANEOUS_EXCLUDE_RE = re.compile("|".join(SPONTANEOUS_EXCLUDE_PATTERNS))
+SPONTANEOUS_MIN_SCORE = 90
 
 # (keyword, score, reason_fr, extra_tags_opt, site_opt, careers_opt)
 SPONTANEOUS_TARGETS: tuple[tuple[str, int, str, list[str] | None, str | None, str | None], ...] = (
@@ -530,7 +531,7 @@ def refresh_spontaneous_recommendations(cur) -> dict[str, Any]:
 
     for r in rows:
         target = _match_spontaneous_target(r["nom"])
-        if not target:
+        if not target or target[1] < SPONTANEOUS_MIN_SCORE:
             continue
         _, score, reason, tags, site, careers = target
         grp = _spontaneous_group_key(r["nom"])

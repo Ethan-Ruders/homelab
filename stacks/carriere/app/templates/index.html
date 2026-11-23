@@ -503,9 +503,9 @@
     <div class="filters">
       <input type="search" id="f-spont-q" placeholder="Rechercher cible spontanée, domaine, ville..." />
       <select id="f-spont-score">
-        <option value="">Toutes les cibles</option>
-        <option value="90">Priorité absolue (&ge; 90)</option>
-        <option value="80">Très bon potentiel (&ge; 80)</option>
+        <option value="">Toutes les cibles (&ge; 90)</option>
+        <option value="95">Incontournables (&ge; 95)</option>
+        <option value="92">Très haute priorité (&ge; 92)</option>
       </select>
       <select id="f-spont-trajet">
         <option value="">&le; 30 min</option>
@@ -964,7 +964,7 @@ async function toggleCompanySpont(id, spontanee_recommandee) {
   if (spontanee_recommandee) {
     const existing = findCompanyById(id);
     if (existing && (existing.spontanee_score === null || existing.spontanee_score === undefined)) {
-      payload.spontanee_score = existing.priorite === 1 ? 85 : 75;
+      payload.spontanee_score = 90;
     }
   }
   await api(`/api/entreprises/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
@@ -1113,7 +1113,7 @@ async function saveCompanyDrawer(id) {
     notes: document.getElementById("d-e-notes").value,
   };
   if (spontChecked && existing && (existing.spontanee_score === null || existing.spontanee_score === undefined)) {
-    payload.spontanee_score = payload.priorite === 1 ? 85 : 75;
+    payload.spontanee_score = 90;
   }
   await api(`/api/entreprises/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
   closeDrawer();
