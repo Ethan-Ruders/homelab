@@ -7,6 +7,7 @@ import html
 import logging
 import os
 import re
+import time
 import unicodedata
 import xml.etree.ElementTree as ET
 from typing import Any
@@ -255,6 +256,7 @@ def _collect_thales(client: httpx.Client, zones: dict[str, dict[str, Any]]) -> l
     out: list[dict[str, Any]] = []
     seen_paths: set[str] = set()
     for query in ("Brest", "Lannion", "Caen"):
+        time.sleep(1.2)
         resp = client.post(
             THALES_JOBS_URL,
             json={"appliedFacets": {}, "limit": 20, "offset": 0, "searchText": query},
@@ -272,6 +274,7 @@ def _collect_thales(client: httpx.Client, zones: dict[str, dict[str, Any]]) -> l
 
             detail = {}
             try:
+                time.sleep(1.2)
                 dr = client.get(f"{THALES_BASE_URL}/wday/cxs/thales/Careers{path}")
                 if dr.status_code == 200:
                     detail = dr.json().get("jobPostingInfo") or {}
@@ -460,17 +463,20 @@ def _collect_adzuna(client: httpx.Client, zones: dict[str, dict[str, Any]]) -> l
     out: list[dict[str, Any]] = []
     seen_ids: set[str] = set()
     city_map = {"loperhet": "Brest", "lannion": "Lannion", "caen": "Caen"}
+    what_or = "cybersecurite cyber securite ia data reseau systeme informatique linux cloud devops developpeur ingenieur"
     for zcode, city in city_map.items():
-        for what in ("stage cybersecurite ia informatique reseau", "alternance cybersecurite ia informatique reseau"):
+        for contract_kw in ("stage", "alternance"):
             resp = client.get(
                 "https://api.adzuna.com/v1/api/jobs/fr/search/1",
                 params={
                     "app_id": app_id,
                     "app_key": app_key,
-                    "results_per_page": 25,
-                    "what": what,
+                    "results_per_page": 50,
+                    "what": contract_kw,
+                    "what_or": what_or,
                     "where": city,
                     "distance": 30,
+                    "max_days_old": 30,
                 },
             )
             resp.raise_for_status()
@@ -480,18 +486,23 @@ def _collect_adzuna(client: httpx.Client, zones: dict[str, dict[str, Any]]) -> l
                 url = (r.get("redirect_url") or "").strip()
                 if not aid or aid in seen_ids or not title or not url:
                     continue
-                tcontrat = _classify_contract(title, what)
+                desc = _clean_html(r.get("description") or "")
+                tcontrat = _classify_contract(title, desc[:250])
                 if not tcontrat:
                     continue
-                desc = _clean_html(r.get("description") or "")
                 if not _is_relevant_domain(title, desc):
                     continue
                 lat = r.get("latitude")
                 lon = r.get("longitude")
                 loc_disp = ((r.get("location") or {}).get("display_name") or city)
-                mz, trajet = _detect_zone_and_trajet(float(lon) if lon else None, float(lat) if lat else None, loc_disp, zones)
-                if not mz:
-                    mz, trajet = zcode, "20-30min"
+                if lat is not None and lon is not None:
+                    mz, trajet = _detect_zone_and_trajet(float(lon), float(lat), loc_disp, zones)
+                    if not mz:
+                        continue
+                else:
+                    mz, trajet = _detect_zone_and_trajet(None, None, loc_disp, zones)
+                    if not mz:
+                        mz, trajet = zcode, "20-30min"
                 seen_ids.add(aid)
                 out.append({
                     "source": "adzuna",
