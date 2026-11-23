@@ -167,6 +167,10 @@ _SKIP_DURATION_SENTENCE_RE = re.compile(
 )
 
 _MONTHS_RE = "|".join(sorted(_MONTH_MAP.keys(), key=len, reverse=True))
+STAGE_MIN_WEEKS_FLOOR = 10
+STAGE_MAX_WEEKS_CAP = 12
+STAGE_END_MAX_DATE = date(2027, 8, 20)
+
 _DATE_EXPR_RE = (
     rf"(?:(debut|mi|fin)\s*(?:-|d'|de\s+|du\s+)?)?"
     rf"(?:(\d{{1,2}})(?:er)?\s+)?\b({_MONTHS_RE})\b(?:\s+(202[5-9]|2030))?"
@@ -187,11 +191,22 @@ _FLEX_WINDOW_RE = re.compile(
     rf"(?:pour\s+un\s+)?(?:debut(?:\s+du\s+stage)?|demarrage|prise\s+de\s+poste)\s+(?:prevu(?:e)?\s+)?"
     rf"entre\s+(?:le\s+)?{_DATE_EXPR_RE}\s+et\s+(?:le\s+)?{_DATE_EXPR_RE}"
 )
+_RANGE_NUM_RE = re.compile(rf"\b(?:du|de)\s+(?:le\s+)?{_NUM_DATE_EXPR_RE}\s+(?:au|a)\s+(?:le\s+)?{_NUM_DATE_EXPR_RE}")
+_RANGE_TEXT_RE = re.compile(rf"\b(?:du|de)\s+(?:le\s+)?{_DATE_EXPR_RE}\s+(?:au|a)\s+(?:le\s+|au\s+)?{_DATE_EXPR_RE}")
 _TRIGGER_NUM_DATE_RE = re.compile(rf"{_START_TRIGGER_RE}(?:le\s+)?{_NUM_DATE_EXPR_RE}")
 _TRIGGER_TEXT_DATE_RE = re.compile(rf"{_START_TRIGGER_RE}(?:le\s+|au\s+|en\s+)?{_DATE_EXPR_RE}")
 _PERIOD_RANGE_RE = re.compile(
     rf"\bentre\s+(?:le\s+)?{_DATE_EXPR_RE}\s+et\s+(?:le\s+)?{_DATE_EXPR_RE}"
 )
+_END_TRIGGER_RE = (
+    r"(?:\bjusqu'?\s*(?:au|a|en)\s+(?:(?:le|la)\s+)?|"
+    r"\bfin(?:\s+du\s+stage|\s+prevue)?(?:\s*:\s*|\s+(?:au|le|en)\s+)|"
+    r"\bse\s+termin(?:ant|e)\s+(?:au|le|en)\s+|"
+    r"\bcloture\s+(?:au|le|en)\s+)"
+)
+_END_TRIGGER_NUM_RE = re.compile(rf"{_END_TRIGGER_RE}(?:le\s+)?{_NUM_DATE_EXPR_RE}")
+_END_TRIGGER_TEXT_RE = re.compile(rf"{_END_TRIGGER_RE}(?:le\s+|au\s+|en\s+)?{_DATE_EXPR_RE}")
+_END_RENTREE_RE = re.compile(r"\bjusqu'?\s*(?:a|en)\s+(?:la\s+)?rentree\b")
 _SUMMER_RE = re.compile(
     r"(?:stage\s+(?:d'|de\s+l')?ete|pour\s+l'ete|cet\s+ete|\bete\s+(202[6-9])\b|periode\s+estivale)"
 )
@@ -273,6 +288,11 @@ def _resolve_date(day: int, month: int, year_opt: int | None, ref_date: date) ->
     return cand
 
 
+def _parse_numeric_date_groups(d_s: str, m_s: str, y_raw: str | None, ref_date: date) -> date | None:
+    y_opt = (2000 + int(y_raw)) if (y_raw and len(y_raw) == 2) else (int(y_raw) if y_raw else None)
+    return _resolve_date(int(d_s), int(m_s), y_opt, ref_date)
+
+
 def _date_from_text_groups(qual: str | None, day_s: str | None, month_s: str, year_s: str | None, ref_date: date) -> date | None:
     month = _MONTH_MAP.get(month_s)
     if not month:
@@ -287,6 +307,40 @@ def _date_from_text_groups(qual: str | None, day_s: str | None, month_s: str, ye
         day = 1
     year_opt = int(year_s) if year_s else None
     return _resolve_date(day, month, year_opt, ref_date)
+
+
+def _date_from_end_text_groups(
+    qual: str | None,
+    day_s: str | None,
+    month_s: str,
+    year_s: str | None,
+    ref_date: date,
+    start_dt: date | None = None,
+) -> date | None:
+    month = _MONTH_MAP.get(month_s)
+    if not month:
+        return None
+    year_opt = int(year_s) if year_s else None
+    if year_opt is None and start_dt is not None:
+        year_opt = start_dt.year if month >= start_dt.month else start_dt.year + 1
+    if day_s:
+        day = int(day_s)
+    elif qual == "debut":
+        day = 1
+    elif qual == "fin":
+        base = _resolve_date(1, month, year_opt, ref_date)
+        if not base:
+            return None
+        day = calendar.monthrange(base.year, month)[1]
+    else:
+        day = 15
+    return _resolve_date(day, month, year_opt, ref_date)
+
+
+def _infer_pair_start_year(m1: int | None, m2: int | None, y1_s: str | None, y2_s: str | None) -> str | None:
+    if y1_s or not (y2_s and m1 and m2):
+        return y1_s
+    return str(int(y2_s) if m1 <= m2 else int(y2_s) - 1)
 
 
 def _strip_pub_metadata(text: str) -> str:
@@ -310,12 +364,21 @@ def _parse_stage_start_date(norm_desc: str, norm_title: str, ref_date: date) -> 
         # Upper bound reflects the latest flexible start the employer accepts.
         return _date_from_text_groups(mw.group(5), mw.group(6), mw.group(7), mw.group(8), ref_date)
 
+    mrn = _RANGE_NUM_RE.search(clean_text)
+    if mrn:
+        y1_s = _infer_pair_start_year(int(mrn.group(2)), int(mrn.group(5)), mrn.group(3), mrn.group(6))
+        res = _parse_numeric_date_groups(mrn.group(1), mrn.group(2), y1_s, ref_date)
+        if res:
+            return res
+
+    mrt = _RANGE_TEXT_RE.search(clean_text)
+    if mrt:
+        y1_s = _infer_pair_start_year(_MONTH_MAP.get(mrt.group(3)), _MONTH_MAP.get(mrt.group(7)), mrt.group(4), mrt.group(8))
+        return _date_from_text_groups(mrt.group(1), mrt.group(2), mrt.group(3), y1_s, ref_date)
+
     mn = _TRIGGER_NUM_DATE_RE.search(clean_text)
     if mn:
-        d, m = int(mn.group(1)), int(mn.group(2))
-        y_raw = mn.group(3)
-        y_opt = (2000 + int(y_raw)) if (y_raw and len(y_raw) == 2) else (int(y_raw) if y_raw else None)
-        res = _resolve_date(d, m, y_opt, ref_date)
+        res = _parse_numeric_date_groups(mn.group(1), mn.group(2), mn.group(3), ref_date)
         if res:
             return res
 
@@ -325,12 +388,7 @@ def _parse_stage_start_date(norm_desc: str, norm_title: str, ref_date: date) -> 
 
     mp = _PERIOD_RANGE_RE.search(clean_text)
     if mp:
-        m1 = _MONTH_MAP.get(mp.group(3))
-        m2 = _MONTH_MAP.get(mp.group(7))
-        y1_s = mp.group(4)
-        y2_s = mp.group(8)
-        if not y1_s and y2_s and m1 and m2:
-            y1_s = str(int(y2_s) if m1 <= m2 else int(y2_s) - 1)
+        y1_s = _infer_pair_start_year(_MONTH_MAP.get(mp.group(3)), _MONTH_MAP.get(mp.group(7)), mp.group(4), mp.group(8))
         return _date_from_text_groups(mp.group(1), mp.group(2), mp.group(3), y1_s, ref_date)
 
     ms = _SUMMER_RE.search(clean_text)
@@ -340,18 +398,75 @@ def _parse_stage_start_date(norm_desc: str, norm_title: str, ref_date: date) -> 
     return None
 
 
+def _parse_stage_end_date(
+    norm_desc: str,
+    norm_title: str,
+    ref_date: date,
+    start_dt: date | None,
+) -> date | None:
+    clean_text = _strip_pub_metadata(f"{norm_title}\n{norm_desc}")
+    clean_text = _FLEX_WINDOW_RE.sub(" ", clean_text)
+
+    mrn = _RANGE_NUM_RE.search(clean_text)
+    if mrn:
+        res = _parse_numeric_date_groups(mrn.group(4), mrn.group(5), mrn.group(6), ref_date)
+        if res:
+            return res
+
+    mrt = _RANGE_TEXT_RE.search(clean_text)
+    if mrt:
+        return _date_from_end_text_groups(mrt.group(5), mrt.group(6), mrt.group(7), mrt.group(8), ref_date, start_dt)
+
+    mp = _PERIOD_RANGE_RE.search(clean_text)
+    if mp:
+        return _date_from_end_text_groups(mp.group(5), mp.group(6), mp.group(7), mp.group(8), ref_date, start_dt)
+
+    men = _END_TRIGGER_NUM_RE.search(clean_text)
+    if men:
+        res = _parse_numeric_date_groups(men.group(1), men.group(2), men.group(3), ref_date)
+        if res:
+            return res
+
+    met = _END_TRIGGER_TEXT_RE.search(clean_text)
+    if met:
+        return _date_from_end_text_groups(met.group(1), met.group(2), met.group(3), met.group(4), ref_date, start_dt)
+
+    if _END_RENTREE_RE.search(clean_text):
+        return _resolve_date(1, 9, None, ref_date)
+    return None
+
+
 def extract_stage_timing(
     title: str,
     description: str | None,
     date_publication: date | None = None,
-) -> tuple[int | None, int | None, date | None]:
-    """Extract normalized stage duration range (weeks) and start date from French offer text."""
+) -> tuple[int | None, int | None, date | None, date | None]:
+    """Extract normalized stage duration range (weeks), start date, and end date."""
     norm_title = _norm_stage_text(title)
     norm_desc = _norm_stage_text(description)
     ref_date = date_publication or date.today()
     dmin, dmax = _parse_duration_weeks(norm_desc, norm_title)
     start_dt = _parse_stage_start_date(norm_desc, norm_title, ref_date)
-    return dmin, dmax, start_dt
+    end_dt = _parse_stage_end_date(norm_desc, norm_title, ref_date, start_dt)
+    return dmin, dmax, start_dt, end_dt
+
+
+def is_stage_timing_acceptable(
+    dmin: int | None,
+    dmax: int | None,
+    start_dt: date | None,
+    end_dt: date | None,
+) -> bool:
+    """Reject stages > 12 weeks or ending after mid-August (rentree cutoff)."""
+    if dmin is not None and dmin > STAGE_MAX_WEEKS_CAP:
+        return False
+    if end_dt is not None and end_dt > STAGE_END_MAX_DATE:
+        return False
+    if start_dt is not None:
+        implied_end = start_dt + timedelta(weeks=dmin or STAGE_MIN_WEEKS_FLOOR)
+        if implied_end > STAGE_END_MAX_DATE:
+            return False
+    return True
 
 
 def _match_company(cur, siret: str | None, name: str) -> tuple[int | None, str | None, str | None]:
@@ -376,9 +491,27 @@ def _match_company(cur, siret: str | None, name: str) -> tuple[int | None, str |
     return None, None, None
 
 
-def _upsert_offer(cur, item: dict[str, Any]) -> bool:
+def _upsert_offer(cur, item: dict[str, Any]) -> bool | None:
     dedup_raw = f"{_norm(item['entreprise_nom']).strip()}|{_norm(item['titre']).strip()}|{item['zone']}"
     item["dedup_hash"] = hashlib.sha256(dedup_raw.encode("utf-8")).hexdigest()
+
+    if item.get("type_contrat") == "stage":
+        dmin, dmax, start_dt, end_dt = extract_stage_timing(
+            item["titre"],
+            item.get("description"),
+            item.get("date_publication"),
+        )
+        if not is_stage_timing_acceptable(dmin, dmax, start_dt, end_dt):
+            return None
+        item["duree_semaines_min"] = dmin
+        item["duree_semaines_max"] = dmax
+        item["date_debut_stage"] = start_dt
+        item["date_fin_stage"] = end_dt
+    else:
+        item["duree_semaines_min"] = None
+        item["duree_semaines_max"] = None
+        item["date_debut_stage"] = None
+        item["date_fin_stage"] = None
 
     ent_id, ent_desc, ent_trajet = _match_company(cur, item.pop("siret", None), item["entreprise_nom"])
     item["entreprise_id"] = ent_id
@@ -387,30 +520,16 @@ def _upsert_offer(cur, item: dict[str, Any]) -> bool:
     if not item.get("trajet_tranche") and ent_trajet:
         item["trajet_tranche"] = ent_trajet
 
-    if item.get("type_contrat") == "stage":
-        dmin, dmax, start_dt = extract_stage_timing(
-            item["titre"],
-            item.get("description"),
-            item.get("date_publication"),
-        )
-        item["duree_semaines_min"] = dmin
-        item["duree_semaines_max"] = dmax
-        item["date_debut_stage"] = start_dt
-    else:
-        item["duree_semaines_min"] = None
-        item["duree_semaines_max"] = None
-        item["date_debut_stage"] = None
-
     cur.execute(
         """
         INSERT INTO offres (
             source, external_id, dedup_hash, entreprise_id, entreprise_nom, entreprise_resume,
-            titre, type_contrat, duree_semaines_min, duree_semaines_max, date_debut_stage,
+            titre, type_contrat, duree_semaines_min, duree_semaines_max, date_debut_stage, date_fin_stage,
             zone, ville, trajet_tranche, url_directe, description, date_publication
         )
         VALUES (
             %(source)s, %(external_id)s, %(dedup_hash)s, %(entreprise_id)s, %(entreprise_nom)s, %(entreprise_resume)s,
-            %(titre)s, %(type_contrat)s, %(duree_semaines_min)s, %(duree_semaines_max)s, %(date_debut_stage)s,
+            %(titre)s, %(type_contrat)s, %(duree_semaines_min)s, %(duree_semaines_max)s, %(date_debut_stage)s, %(date_fin_stage)s,
             %(zone)s, %(ville)s, %(trajet_tranche)s, %(url_directe)s, %(description)s, %(date_publication)s
         )
         ON CONFLICT (source, external_id) DO UPDATE SET
@@ -419,6 +538,7 @@ def _upsert_offer(cur, item: dict[str, Any]) -> bool:
             duree_semaines_min = COALESCE(offres.duree_semaines_min, EXCLUDED.duree_semaines_min),
             duree_semaines_max = COALESCE(offres.duree_semaines_max, EXCLUDED.duree_semaines_max),
             date_debut_stage = COALESCE(offres.date_debut_stage, EXCLUDED.date_debut_stage),
+            date_fin_stage = COALESCE(offres.date_fin_stage, EXCLUDED.date_fin_stage),
             trajet_tranche = COALESCE(offres.trajet_tranche, EXCLUDED.trajet_tranche),
             url_directe = EXCLUDED.url_directe,
             description = COALESCE(NULLIF(EXCLUDED.description, ''), offres.description),
@@ -800,13 +920,24 @@ def collect_all_offers(cur) -> dict[str, Any]:
             try:
                 items = fn(client, zones)
                 inserted = 0
+                upserted = 0
+                skipped_timing = 0
                 for item in items:
-                    if _upsert_offer(cur, item):
-                        inserted += 1
-                summary["sources"][name] = {"fetched": len(items), "inserted": inserted}
+                    res = _upsert_offer(cur, item)
+                    if res is None:
+                        skipped_timing += 1
+                    else:
+                        upserted += 1
+                        if res:
+                            inserted += 1
+                summary["sources"][name] = {
+                    "fetched": len(items),
+                    "inserted": inserted,
+                    "skipped_stage_timing": skipped_timing,
+                }
                 summary["total_fetched"] += len(items)
                 summary["total_inserted"] += inserted
-                summary["total_upserted"] += len(items)
+                summary["total_upserted"] += upserted
             except Exception as exc:
                 logger.warning("Collector %s failed: %s", name, exc)
                 summary["sources"][name] = {"error": str(exc)[:220]}

@@ -189,7 +189,7 @@
     .b-fit-ok { background: rgba(34, 197, 94, 0.16); color: #86efac; border: 1px solid rgba(34, 197, 94, 0.35); }
     .b-fit-ko { background: rgba(239, 68, 68, 0.16); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.35); }
     .stage-meta { display: flex; flex-direction: column; gap: 4px; margin-top: 5px; }
-    .field-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .field-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
     select.status-sel {
       background: var(--bg);
       color: var(--text);
@@ -286,7 +286,7 @@
   <div class="brand">
     <div>
       <h1>Homelab Career Radar</h1>
-      <span>1A Ingé · Stage Été 2027 (10–12 sem., &ge; 27 mai) &amp; Alternance 2 ans (Sept. 2027) · Loperhet / Lannion / Caen</span>
+      <span>1A Ingé · Stage Été 2027 (10–12 sem., 27 mai – mi-août) &amp; Alternance 2 ans (Sept. 2027) · Loperhet / Lannion / Caen</span>
     </div>
   </div>
   <div class="tabs">
@@ -372,11 +372,11 @@
         <option value="70">Score &ge; 70</option>
         <option value="55">Score &ge; 55</option>
       </select>
-      <select id="f-offres-stage-fit" title="Filtrer les stages selon durée (10–12 sem.) et début (≥ 27 mai)">
+      <select id="f-offres-stage-fit" title="Filtrer les stages selon durée (10–12 sem.) et période (27 mai → mi-août)">
         <option value="">Stage : toutes durées / dates</option>
-        <option value="compatible">10–12 sem. &ge; 27 mai (+ N/C)</option>
-        <option value="duree_ok">10–12 sem. confirmé (&ge; 27 mai / N/C)</option>
-        <option value="strict">10–12 sem. &amp; &ge; 27 mai (strict)</option>
+        <option value="compatible">10–12 sem. · 27 mai &rarr; mi-août (+ N/C)</option>
+        <option value="duree_ok">10–12 sem. confirmé · &le; mi-août / N/C</option>
+        <option value="strict">10–12 sem. · 27 mai &rarr; mi-août (strict)</option>
       </select>
       <button class="btn" id="btn-new-offer">+ Ajouter une offre</button>
     </div>
@@ -426,11 +426,11 @@
         <option value="Refusée">Refusée</option>
         <option value="Ignorée">Ignorée</option>
       </select>
-      <select id="f-sel-stage-fit" title="Filtrer les stages selon durée (10–12 sem.) et début (≥ 27 mai)">
+      <select id="f-sel-stage-fit" title="Filtrer les stages selon durée (10–12 sem.) et période (27 mai → mi-août)">
         <option value="">Stage : toutes durées / dates</option>
-        <option value="compatible">10–12 sem. &ge; 27 mai (+ N/C)</option>
-        <option value="duree_ok">10–12 sem. confirmé (&ge; 27 mai / N/C)</option>
-        <option value="strict">10–12 sem. &amp; &ge; 27 mai (strict)</option>
+        <option value="compatible">10–12 sem. · 27 mai &rarr; mi-août (+ N/C)</option>
+        <option value="duree_ok">10–12 sem. confirmé · &le; mi-août / N/C</option>
+        <option value="strict">10–12 sem. · 27 mai &rarr; mi-août (strict)</option>
       </select>
       <span class="muted">Clique sur &#9734; / &#9733; dans <strong>Offres</strong> ou ici pour ajouter ou retirer une offre de ta sélection.</span>
     </div>
@@ -596,9 +596,9 @@ async function loadStats() {
   const sf = st.stages_filtre || {};
   const fitSel = document.getElementById("f-offres-stage-fit");
   if (fitSel) {
-    fitSel.querySelector('option[value="compatible"]').textContent = `10–12 sem. ≥ 27 mai (+ N/C) (${sf.compatible ?? 0})`;
-    fitSel.querySelector('option[value="duree_ok"]').textContent = `10–12 sem. confirmé (≥ 27 mai / N/C) (${sf.duree_ok ?? 0})`;
-    fitSel.querySelector('option[value="strict"]').textContent = `10–12 sem. & ≥ 27 mai (strict) (${sf.strict ?? 0})`;
+    fitSel.querySelector('option[value="compatible"]').textContent = `10–12 sem. · 27 mai → mi-août (+ N/C) (${sf.compatible ?? 0})`;
+    fitSel.querySelector('option[value="duree_ok"]').textContent = `10–12 sem. confirmé · ≤ mi-août / N/C (${sf.duree_ok ?? 0})`;
+    fitSel.querySelector('option[value="strict"]').textContent = `10–12 sem. · 27 mai → mi-août (strict) (${sf.strict ?? 0})`;
   }
 
   document.getElementById("kpi-cards").innerHTML = `
@@ -648,11 +648,21 @@ function renderStageTimingBadges(o) {
   }
   let dateBadge = `<span class="badge b-zone">📅 Début N/C</span>`;
   if (o.date_debut_stage) {
-    const dtOk = o.date_debut_stage >= "2027-05-27";
-    const [y, m, d] = o.date_debut_stage.split("-");
-    dateBadge = `<span class="badge ${dtOk ? "b-fit-ok" : "b-fit-ko"}">📅 dès ${esc(d)}/${esc(m)}/${esc(y)}</span>`;
+    const [y, m, d] = o.date_debut_stage.split("-").map(Number);
+    const startDate = new Date(Date.UTC(y, m - 1, d));
+    const impliedEndIso = new Date(startDate.getTime() + (dmin || 10) * 7 * 86400000).toISOString().slice(0, 10);
+    const dtOk = o.date_debut_stage >= "2027-05-27" && impliedEndIso <= "2027-08-20";
+    const dd = String(d).padStart(2, "0");
+    const mm = String(m).padStart(2, "0");
+    dateBadge = `<span class="badge ${dtOk ? "b-fit-ok" : "b-fit-ko"}">📅 dès ${dd}/${mm}/${y}</span>`;
   }
-  return `<div class="stage-meta">${durBadge}${dateBadge}</div>`;
+  let endBadge = "";
+  if (o.date_fin_stage) {
+    const endOk = o.date_fin_stage <= "2027-08-20";
+    const [ey, em, ed] = o.date_fin_stage.split("-");
+    endBadge = `<span class="badge ${endOk ? "b-fit-ok" : "b-fit-ko"}">🏁 fin ${esc(ed)}/${esc(em)}/${esc(ey)}</span>`;
+  }
+  return `<div class="stage-meta">${durBadge}${dateBadge}${endBadge}</div>`;
 }
 
 function renderOfferRow(o) {
@@ -842,10 +852,13 @@ function openOfferDrawer(id) {
       <label for="d-o-starred" style="margin:0; cursor:pointer; color:#facc15;">&#9733; Pointée dans ma sélection</label>
     </div>
     ${o.type_contrat === "stage" ? `
-    <div class="field-grid-3">
+    <div class="field-grid-2">
       <div class="field"><label>Durée min (sem.)</label><input type="number" min="1" max="60" id="d-o-dmin" value="${o.duree_semaines_min ?? ""}" placeholder="ex: 10" /></div>
       <div class="field"><label>Durée max (sem.)</label><input type="number" min="1" max="60" id="d-o-dmax" value="${o.duree_semaines_max ?? ""}" placeholder="ex: 12" /></div>
+    </div>
+    <div class="field-grid-2">
       <div class="field"><label>Date début stage</label><input type="date" id="d-o-dstart" value="${esc(o.date_debut_stage || "")}" /></div>
+      <div class="field"><label>Date fin stage</label><input type="date" id="d-o-dend" value="${esc(o.date_fin_stage || "")}" /></div>
     </div>` : ""}
     <div class="field"><label>Ce que fait l'entreprise</label><textarea id="d-o-eresume">${esc(o.entreprise_resume || "")}</textarea></div>
     <div class="field"><label>Résumé IA</label><textarea id="d-o-resume">${esc(o.resume_ia || "")}</textarea></div>
@@ -877,9 +890,11 @@ async function saveOfferDrawer(id) {
   if (dminEl) {
     const dmaxEl = document.getElementById("d-o-dmax");
     const dstartEl = document.getElementById("d-o-dstart");
+    const dendEl = document.getElementById("d-o-dend");
     payload.duree_semaines_min = dminEl.value ? Number(dminEl.value) : null;
     payload.duree_semaines_max = dmaxEl.value ? Number(dmaxEl.value) : null;
     payload.date_debut_stage = dstartEl.value || null;
+    payload.date_fin_stage = dendEl.value || null;
   }
   await api(`/api/offres/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
   closeDrawer();
@@ -938,11 +953,16 @@ function openNewOfferModal() {
     </div>
     <div class="field"><label>Entreprise *</label><input id="n-o-ent" /></div>
     <div class="field"><label>Titre du poste *</label><input id="n-o-tit" /></div>
-    <div class="field"><label>Type</label><select id="n-o-type" onchange="document.getElementById('n-o-stage-box').style.display = this.value === 'stage' ? 'grid' : 'none';"><option value="alternance">Alternance (2 ans)</option><option value="stage">Stage (été)</option></select></div>
-    <div class="field-grid-3" id="n-o-stage-box" style="display:none;">
-      <div class="field"><label>Durée min (sem.)</label><input type="number" min="1" max="60" id="n-o-dmin" placeholder="ex: 10" /></div>
-      <div class="field"><label>Durée max (sem.)</label><input type="number" min="1" max="60" id="n-o-dmax" placeholder="ex: 12" /></div>
-      <div class="field"><label>Date début stage</label><input type="date" id="n-o-dstart" /></div>
+    <div class="field"><label>Type</label><select id="n-o-type" onchange="document.getElementById('n-o-stage-box').style.display = this.value === 'stage' ? 'block' : 'none';"><option value="alternance">Alternance (2 ans)</option><option value="stage">Stage (été)</option></select></div>
+    <div id="n-o-stage-box" style="display:none;">
+      <div class="field-grid-2">
+        <div class="field"><label>Durée min (sem.)</label><input type="number" min="1" max="60" id="n-o-dmin" placeholder="ex: 10" /></div>
+        <div class="field"><label>Durée max (sem.)</label><input type="number" min="1" max="60" id="n-o-dmax" placeholder="ex: 12" /></div>
+      </div>
+      <div class="field-grid-2">
+        <div class="field"><label>Date début stage</label><input type="date" id="n-o-dstart" /></div>
+        <div class="field"><label>Date fin stage</label><input type="date" id="n-o-dend" /></div>
+      </div>
     </div>
     <div class="field"><label>Zone</label><select id="n-o-zone"><option value="loperhet">Loperhet / Brest</option><option value="lannion">Lannion</option><option value="caen">Caen</option></select></div>
     <div class="field"><label>Ville</label><input id="n-o-ville" /></div>
@@ -972,9 +992,11 @@ async function submitNewOffer() {
     const dmin = document.getElementById("n-o-dmin").value;
     const dmax = document.getElementById("n-o-dmax").value;
     const dstart = document.getElementById("n-o-dstart").value;
+    const dend = document.getElementById("n-o-dend").value;
     if (dmin) payload.duree_semaines_min = Number(dmin);
     if (dmax) payload.duree_semaines_max = Number(dmax);
     if (dstart) payload.date_debut_stage = dstart;
+    if (dend) payload.date_fin_stage = dend;
   }
   await api("/api/offres", { method: "POST", body: JSON.stringify(payload) });
   closeDrawer();

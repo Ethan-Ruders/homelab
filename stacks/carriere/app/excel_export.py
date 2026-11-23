@@ -88,6 +88,7 @@ def _build_offer_rows(items: Iterable[dict]) -> list[list]:
             o.get("type_contrat") or "",
             _format_stage_duration(o),
             str(o["date_debut_stage"]) if o.get("date_debut_stage") else "",
+            str(o["date_fin_stage"]) if o.get("date_fin_stage") else "",
             o.get("score_ia"),
             o.get("domaine_ia") or "",
             o.get("zone") or "",
@@ -115,21 +116,21 @@ def build_workbook_bytes(offres: Iterable[dict], entreprises: Iterable[dict]) ->
     offres_list = list(offres)
 
     o_headers = [
-        "ID", "Pointée", "Statut", "Contrat", "Durée stage", "Début stage",
+        "ID", "Pointée", "Statut", "Contrat", "Durée stage", "Début stage", "Fin stage",
         "Score IA", "Domaine", "Zone", "Trajet voiture",
         "Ville", "Entreprise", "Activité entreprise", "Titre du poste", "Résumé IA",
         "Date publi.", "Date candidature", "Date relance", "Contact", "Source",
         "Lien direct", "Notes",
     ]
-    o_widths = [7, 9, 15, 13, 14, 13, 10, 18, 12, 14, 18, 28, 42, 42, 48, 12, 15, 14, 24, 18, 45, 36]
+    o_widths = [7, 9, 15, 13, 14, 13, 13, 10, 18, 12, 14, 18, 28, 42, 42, 48, 12, 15, 14, 24, 18, 45, 36]
 
     ws_offres = wb.active
     ws_offres.title = "Offres"
-    _style_sheet(ws_offres, o_headers, _build_offer_rows(offres_list), link_cols={21}, status_col=3, widths=o_widths)
+    _style_sheet(ws_offres, o_headers, _build_offer_rows(offres_list), link_cols={22}, status_col=3, widths=o_widths)
 
     ws_sel = wb.create_sheet(title="Sélection")
     starred_list = [o for o in offres_list if o.get("is_starred")]
-    _style_sheet(ws_sel, o_headers, _build_offer_rows(starred_list), link_cols={21}, status_col=3, widths=o_widths)
+    _style_sheet(ws_sel, o_headers, _build_offer_rows(starred_list), link_cols={22}, status_col=3, widths=o_widths)
 
     ws_ent = wb.create_sheet(title="Entreprises")
     e_headers = [

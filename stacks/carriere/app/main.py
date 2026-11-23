@@ -25,6 +25,7 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 DEFAULT_STAGE_MIN_WEEKS = 10
 DEFAULT_STAGE_MAX_WEEKS = 12
 DEFAULT_STAGE_START_MIN = date(2027, 5, 27)
+DEFAULT_STAGE_END_MAX = date(2027, 8, 20)
 
 app = FastAPI(title="Homelab Career Radar", version="1.0.0")
 
@@ -42,6 +43,7 @@ class OfferCreate(BaseModel):
     duree_semaines_min: int | None = Field(default=None, ge=1, le=60)
     duree_semaines_max: int | None = Field(default=None, ge=1, le=60)
     date_debut_stage: date | None = None
+    date_fin_stage: date | None = None
     zone: str = Field(default="loperhet")
     ville: str | None = None
     url_directe: str = Field(..., min_length=4, max_length=1000)
@@ -67,6 +69,7 @@ class OfferPatch(BaseModel):
     duree_semaines_min: int | None = Field(default=None, ge=1, le=60)
     duree_semaines_max: int | None = Field(default=None, ge=1, le=60)
     date_debut_stage: date | None = None
+    date_fin_stage: date | None = None
 
 
 class CompanyCreate(BaseModel):
@@ -109,6 +112,7 @@ class ScoreItem(BaseModel):
     duree_semaines_min: int | None = Field(default=None, ge=1, le=60)
     duree_semaines_max: int | None = Field(default=None, ge=1, le=60)
     date_debut_stage: date | None = None
+    date_fin_stage: date | None = None
 
 
 class ApplyScoresPayload(BaseModel):
@@ -174,17 +178,25 @@ def _serialize_dates(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def _stage_filter_clause(mode: str, alias: str = "o.") -> str:
-    """Return SQL predicate for stage duration/start-date matching."""
+    """Return SQL predicate (6 placeholders) for stage duration, start >= 27 May, and end <= mid-August."""
     dur_overlap = (
         f"{alias}duree_semaines_min IS NOT NULL AND {alias}duree_semaines_min <= %s "
         f"AND COALESCE({alias}duree_semaines_max, {alias}duree_semaines_min) >= %s"
     )
-    dur_compat = f"({alias}duree_semaines_min IS NULL OR ({dur_overlap}))"
-    if mode == "strict":
-        return f"{dur_overlap} AND {alias}date_debut_stage IS NOT NULL AND {alias}date_debut_stage >= %s"
-    if mode == "duree_ok":
-        return f"{dur_overlap} AND ({alias}date_debut_stage IS NULL OR {alias}date_debut_stage >= %s)"
-    return f"{dur_compat} AND ({alias}date_debut_stage IS NULL OR {alias}date_debut_stage >= %s)"
+    dur_clause = (
+        dur_overlap
+        if mode in ("strict", "duree_ok")
+        else f"({alias}duree_semaines_min IS NULL OR ({dur_overlap}))"
+    )
+    start_clause = (
+        f"{alias}date_debut_stage IS NOT NULL AND {alias}date_debut_stage >= %s"
+        if mode == "strict"
+        else f"({alias}date_debut_stage IS NULL OR {alias}date_debut_stage >= %s)"
+    )
+    end_explicit = f"({alias}date_fin_stage IS NULL OR {alias}date_fin_stage <= %s)"
+    implied_cmp = f"({alias}date_debut_stage + (COALESCE({alias}duree_semaines_min, %s) * 7)) <= %s"
+    end_implied = implied_cmp if mode == "strict" else f"({alias}date_debut_stage IS NULL OR {implied_cmp})"
+    return f"{dur_clause} AND {start_clause} AND {end_explicit} AND {end_implied}"
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -251,11 +263,15 @@ def get_stats():
         )
         offres_pointees = cur.fetchone()["cnt"]
 
-        stage_params = (
-            DEFAULT_STAGE_MAX_WEEKS, DEFAULT_STAGE_MIN_WEEKS, DEFAULT_STAGE_START_MIN,
-            DEFAULT_STAGE_MAX_WEEKS, DEFAULT_STAGE_MIN_WEEKS, DEFAULT_STAGE_START_MIN,
-            DEFAULT_STAGE_MAX_WEEKS, DEFAULT_STAGE_MIN_WEEKS, DEFAULT_STAGE_START_MIN,
+        single_stage_params = (
+            DEFAULT_STAGE_MAX_WEEKS,
+            DEFAULT_STAGE_MIN_WEEKS,
+            DEFAULT_STAGE_START_MIN,
+            DEFAULT_STAGE_END_MAX,
+            DEFAULT_STAGE_MIN_WEEKS,
+            DEFAULT_STAGE_END_MAX,
         )
+        stage_params = single_stage_params * 3
         cur.execute(
             f"""
             SELECT
@@ -303,6 +319,7 @@ def list_offres(
     duree_min: int = Query(default=DEFAULT_STAGE_MIN_WEEKS, ge=1, le=60),
     duree_max: int = Query(default=DEFAULT_STAGE_MAX_WEEKS, ge=1, le=60),
     debut_min: date = Query(default=DEFAULT_STAGE_START_MIN),
+    fin_max: date = Query(default=DEFAULT_STAGE_END_MAX),
     q: str | None = Query(default=None),
 ):
     where = ["1=1"]
@@ -317,7 +334,7 @@ def list_offres(
         if type_contrat != "stage":
             where.append("o.type_contrat = 'stage'")
         where.append(_stage_filter_clause(stage_filter, "o."))
-        params.extend([duree_max, duree_min, debut_min])
+        params.extend([duree_max, duree_min, debut_min, fin_max, duree_min, fin_max])
     if statut:
         where.append("o.statut = %s")
         params.append(statut)
@@ -336,7 +353,7 @@ def list_offres(
     sql = f"""
         SELECT o.id, o.source, o.entreprise_id, o.entreprise_nom,
                COALESCE(NULLIF(o.entreprise_resume, ''), e.description, '') AS entreprise_resume,
-               o.titre, o.type_contrat, o.duree_semaines_min, o.duree_semaines_max, o.date_debut_stage,
+               o.titre, o.type_contrat, o.duree_semaines_min, o.duree_semaines_max, o.date_debut_stage, o.date_fin_stage,
                o.zone, o.ville,
                COALESCE(o.trajet_tranche, e.trajet_tranche) AS trajet_tranche,
                o.url_directe, o.description, o.date_publication, o.score_ia, o.domaine_ia,
@@ -360,8 +377,9 @@ def create_offer(payload: OfferCreate):
     dmin = payload.duree_semaines_min
     dmax = payload.duree_semaines_max
     start_dt = payload.date_debut_stage
-    if payload.type_contrat == "stage" and (dmin is None or start_dt is None):
-        p_dmin, p_dmax, p_start = extract_stage_timing(payload.titre, payload.description)
+    end_dt = payload.date_fin_stage
+    if payload.type_contrat == "stage" and (dmin is None or start_dt is None or end_dt is None):
+        p_dmin, p_dmax, p_start, p_end = extract_stage_timing(payload.titre, payload.description)
         if dmin is None:
             dmin = p_dmin
             dmax = p_dmax
@@ -369,6 +387,8 @@ def create_offer(payload: OfferCreate):
             dmax = dmin
         if start_dt is None:
             start_dt = p_start
+        if end_dt is None:
+            end_dt = p_end
 
     with db_cursor() as cur:
         cur.execute(
@@ -380,12 +400,12 @@ def create_offer(payload: OfferCreate):
             """
             INSERT INTO offres (
                 source, external_id, dedup_hash, entreprise_id, entreprise_nom, entreprise_resume,
-                titre, type_contrat, duree_semaines_min, duree_semaines_max, date_debut_stage,
+                titre, type_contrat, duree_semaines_min, duree_semaines_max, date_debut_stage, date_fin_stage,
                 zone, ville, trajet_tranche, url_directe, description,
                 date_publication, score_ia, statut, is_starred, date_candidature, date_relance, contact_info, notes
             )
             VALUES (
-                'manuel', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                'manuel', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                 CURRENT_DATE, 80, %s, %s, %s, %s, %s, %s
             )
             RETURNING *
@@ -401,6 +421,7 @@ def create_offer(payload: OfferCreate):
                 dmin,
                 dmax,
                 start_dt,
+                end_dt,
                 payload.zone,
                 payload.ville,
                 ent["trajet_tranche"] if ent else None,
@@ -636,6 +657,7 @@ def internal_apply_scores(payload: ApplyScoresPayload):
                     duree_semaines_min = COALESCE(duree_semaines_min, %s),
                     duree_semaines_max = COALESCE(duree_semaines_max, %s),
                     date_debut_stage = COALESCE(date_debut_stage, %s),
+                    date_fin_stage = COALESCE(date_fin_stage, %s),
                     statut = CASE WHEN %s < 55 AND statut = 'À voir' THEN 'Ignorée' ELSE statut END,
                     updated_at = NOW()
                 WHERE id = %s
@@ -648,6 +670,7 @@ def internal_apply_scores(payload: ApplyScoresPayload):
                     item.duree_semaines_min,
                     item.duree_semaines_max,
                     item.date_debut_stage,
+                    item.date_fin_stage,
                     item.score_ia,
                     item.id,
                 ),
