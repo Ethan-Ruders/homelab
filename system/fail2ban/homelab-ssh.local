@@ -1,0 +1,14 @@
+[DEFAULT]
+bantime   = 1h
+findtime  = 10m
+maxretry  = 5
+backend   = auto
+banaction = nftables-multiport
+ignoreip  = 127.0.0.1/8 ::1
+
+[sshd]
+enabled = true
+port    = ssh
+logpath = /var/log/auth.log
+action  = %(banaction)s[name=%(__name__)s, port="%(port)s", protocol="%(protocol)s"]
+          homelab-discord[name=%(__name__)s]

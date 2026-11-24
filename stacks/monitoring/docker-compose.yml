@@ -1,6 +1,8 @@
 volumes:
   prometheus_data: {}
   grafana_data: {}
+  loki_data: {}
+  alloy_data: {}
 
 services:
   prometheus:
@@ -25,8 +27,59 @@ services:
     restart: unless-stopped
     volumes:
       - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards-provisioned:ro
     depends_on:
       - prometheus
+      - loki
+    networks:
+      - default
+      - homelab-net
+
+  loki:
+    image: grafana/loki:3
+    container_name: loki
+    restart: unless-stopped
+    mem_limit: 384m
+    environment:
+      - GOMEMLIMIT=256MiB
+    command:
+      - '-config.file=/etc/loki/local-config.yaml'
+    volumes:
+      - ./loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    ports:
+      - "127.0.0.1:3100:3100"
+    networks:
+      - default
+      - homelab-net
+
+  alloy:
+    image: grafana/alloy:latest
+    container_name: alloy
+    restart: unless-stopped
+    mem_limit: 384m
+    environment:
+      - GOMEMLIMIT=256MiB
+    command:
+      - 'run'
+      - '--server.http.listen-addr=0.0.0.0:12345'
+      - '--storage.path=/var/lib/alloy/data'
+      - '--disable-reporting'
+      - '/etc/alloy/config.alloy'
+    depends_on:
+      - loki
+    ports:
+      - "127.0.0.1:12345:12345"
+      - "10.0.0.74:1514:1514/udp"
+      - "10.0.0.74:1514:1514/tcp"
+    volumes:
+      - ./config.alloy:/etc/alloy/config.alloy:ro
+      - alloy_data:/var/lib/alloy/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/log:/var/log/host:ro
+      - /home/ethan/npm/data/logs:/var/log/npm:ro
     networks:
       - default
       - homelab-net

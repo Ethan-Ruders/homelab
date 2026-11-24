@@ -59,13 +59,19 @@ sequenceDiagram
 
 ---
 
-## 4. Superviseur système et monitoring
+## 4. Superviseur système, métriques et centralisation des logs
 
 La stack [`stacks/monitoring/docker-compose.yml`](../stacks/monitoring/docker-compose.yml) regroupe :
 - **`node-exporter`** : collecte les métriques système de `Serveur-Linux` (`/proc`, `/sys`, `/` en lecture seule).
 - **`cadvisor`** : collecte l'utilisation CPU, RAM et réseau par conteneur Docker (`--docker_only=true`, connecté à `default` et `homelab-net`).
 - **`prometheus`** : interroge `localhost:9090`, `node-exporter:9100` et `cadvisor:8080` toutes les `15s` ([`prometheus.yml`](../stacks/monitoring/prometheus.yml)).
-- **`grafana`** : exposé derrière `https://grafana.homelab` avec persistance dans `grafana_data` et deux dashboards ([Système Node Exporter](../stacks/monitoring/dashboards/node-exporter.json) et [Conteneurs cAdvisor](../stacks/monitoring/dashboards/docker-cadvisor.json)).
+- **`loki`** : moteur de logs TSDB v13 (`384 Mo` max, `GOMEMLIMIT=256MiB`, [`loki-config.yml`](../stacks/monitoring/loki-config.yml)), rétention locale 14 jours (`336h`), exposé uniquement en interne (`homelab-net` + `127.0.0.1:3100`).
+- **`alloy`** : collecteur **Grafana Alloy** (`384 Mo` max, `GOMEMLIMIT=256MiB`, [`config.alloy`](../stacks/monitoring/config.alloy)) ingérant vers Loki :
+  - les journaux des conteneurs Docker (`/var/run/docker.sock:ro`, labels `container`, `compose_project`) ;
+  - les journaux hôtes (`/var/log/auth.log`, `/var/log/syslog`, `/var/log/fail2ban.log`) ;
+  - les logs Nginx Proxy Manager (`/home/ethan/npm/data/logs/*_{access,error}.log`, extraction des labels `status`, `method`, `vhost`) ;
+  - un récepteur Syslog OPNsense sur `10.0.0.74:1514` (UDP/TCP, limité dans UFW à la passerelle `10.0.0.1`).
+- **`grafana`** : exposé derrière `https://grafana.homelab` avec persistance dans `grafana_data`, datasource `Loki` provisionnée automatiquement ([`loki.yml`](../stacks/monitoring/grafana/provisioning/datasources/loki.yml)), deux dashboards métriques ([Système Node Exporter](../stacks/monitoring/dashboards/node-exporter.json) et [Conteneurs cAdvisor](../stacks/monitoring/dashboards/docker-cadvisor.json)) et le dashboard sécurité provisionné [`Homelab — Logs & Sécurité (Loki)`](../stacks/monitoring/grafana/dashboards/logs-security.json) (`uid: homelab-logs-security`).
 
 ---
 
@@ -77,11 +83,15 @@ La stack [`stacks/homepage/docker-compose.yml`](../stacks/homepage/docker-compos
 
 ---
 
-## 6. Automatisation Discord (`n8n`) et mises à jour de sécurité
+## 6. Durcissement, automatisation Discord (`n8n`) et mises à jour de sécurité
 
 - **Mises à jour de sécurité APT :** `unattended-upgrades` complété par [`system/51homelab-unattended`](../system/51homelab-unattended) (nettoyage automatique des paquets inutilisés, sans redémarrage automatique).
+- **Protection intrusion (`Fail2ban` + `UFW`) :**
+  - `sshd` protégé par [`system/fail2ban/homelab-ssh.local`](../system/fail2ban/homelab-ssh.local) (backend `systemd` / `nftables`, 5 échecs / 10 min → ban 1 h).
+  - Notification Discord immédiate à chaque ban via [`system/fail2ban/homelab-discord.conf`](../system/fail2ban/homelab-discord.conf) et `--fail2ban-ban`.
+  - Ports Syslog `1514` UDP/TCP ouverts uniquement depuis OPNsense (`10.0.0.1`).
 - **Surveillance & veille automatisées :**
   - [`homelab-alerts.json`](../stacks/n8n/workflows/homelab-alerts.json) : contrôle toutes les 10 minutes les services sur `homelab-net` + PostgreSQL, et n'alerte Discord qu'en cas de changement d'état (anti-spam).
-  - [`homelab-backup-alert.json`](../stacks/n8n/workflows/homelab-backup-alert.json) : webhook sécurisé (`X-API-Key`) utilisé par [`homelab-health-alert.sh`](../backups/homelab-health-alert.sh) lors des alertes `OnFailure` de backup ou du contrôle quotidien `08:00` (fraîcheur backup < 26 h, certificat `wildcard.homelab.crt` > 30 j, disque < 85 %).
+  - [`homelab-backup-alert.json`](../stacks/n8n/workflows/homelab-backup-alert.json) : webhook sécurisé (`X-API-Key`) utilisé par [`homelab-health-alert.sh`](../backups/homelab-health-alert.sh) lors des alertes `OnFailure` de backup, du contrôle quotidien `08:00` (fraîcheur backup < 26 h, certificat `wildcard.homelab.crt` > 30 j, disque < 85 %), des bans Fail2ban (`--fail2ban-ban`) et du scan de logs sécurité Loki toutes les 5 minutes via [`homelab-security-watch.timer`](../backups/systemd/homelab-security-watch.timer) (`ssh_auth_failures`, `npm_5xx`, `npm_4xx_burst`, `docker_fatal`, cooldown 30 min).
   - [`homelab-veille-ia-cyber.json`](../stacks/n8n/workflows/homelab-veille-ia-cyber.json) : veille hebdomadaire publiée chaque dimanche à `10:00` (`Europe/Paris`) sur Discord sous la forme d'un **unique message vocal natif (`flags: 8192`) de 2 à 3 minutes** (sans texte ni URL en dessous), couvrant **IA**, **Cybersécurité (CERT-FR / Krebs / etc.)** et **Ingénierie informatique / Tech (InfoQ, Ars Technica, etc.)**. Le script podcast est rédigé en français par `gemini-3.5-flash`, synthétisé en audio par `gemini-2.5-flash-preview-tts` (voix `Aoede`), puis converti en `OGG Opus` (`48 kHz` mono + forme d'onde) et téléversé vers Discord par le sidecar interne [`stacks/tts/`](../stacks/tts/docker-compose.yml) (`homelab-tts` sur `homelab-net`).
   - [`homelab-carriere-radar.json`](../stacks/n8n/workflows/homelab-carriere-radar.json) & [`stacks/carriere/`](../stacks/carriere/docker-compose.yml) : à `09:00` et `18:00` (`Europe/Paris`), collecte les offres de stages et d'alternances (La Bonne Alternance, portails Thales/Sopra Steria/Nokia/Arkéa, Adzuna optionnel) sur les isochrones voiture IGN `≤ 20–30 min` de Loperhet/Brest, Lannion et Caen, score la pertinence par **Google Gemini**, notifie le salon Discord dédié avec liens directs, et expose le suivi + export `.xlsx` sur `https://carriere.homelab` (base PostgreSQL `carriere`).

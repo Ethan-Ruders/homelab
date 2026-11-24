@@ -1,0 +1,7 @@
+[Unit]
+Description=Homelab Loki security log watch
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/homelab-health-alert.sh --security-scan

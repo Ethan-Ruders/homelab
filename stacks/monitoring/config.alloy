@@ -1,0 +1,154 @@
+// Collecte centralisée des logs Serveur-Linux, Docker, NPM, Fail2ban et OPNsense vers Loki
+
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}
+
+// 1. Découverte et collecte des logs des conteneurs Docker
+discovery.docker "containers" {
+  host             = "unix:///var/run/docker.sock"
+  refresh_interval = "30s"
+}
+
+discovery.relabel "containers" {
+  targets = discovery.docker.containers.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+    target_label  = "compose_project"
+  }
+
+  rule {
+    target_label = "job"
+    replacement  = "docker"
+  }
+
+  rule {
+    target_label = "host"
+    replacement  = "serveur-linux"
+  }
+}
+
+loki.source.docker "containers" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.relabel.containers.output
+  forward_to = [loki.write.local.receiver]
+}
+
+// 2. Journaux système & authentification de l'hôte Serveur-Linux
+local.file_match "host_auth" {
+  path_targets = [{
+    __path__ = "/var/log/host/auth.log",
+    job      = "auth",
+    host     = "serveur-linux",
+  }]
+}
+
+loki.source.file "host_auth" {
+  targets    = local.file_match.host_auth.targets
+  forward_to = [loki.write.local.receiver]
+}
+
+local.file_match "host_syslog" {
+  path_targets = [{
+    __path__ = "/var/log/host/syslog",
+    job      = "syslog",
+    host     = "serveur-linux",
+  }]
+}
+
+loki.source.file "host_syslog" {
+  targets    = local.file_match.host_syslog.targets
+  forward_to = [loki.write.local.receiver]
+}
+
+local.file_match "host_fail2ban" {
+  path_targets = [{
+    __path__ = "/var/log/host/fail2ban.log",
+    job      = "fail2ban",
+    host     = "serveur-linux",
+  }]
+}
+
+loki.source.file "host_fail2ban" {
+  targets    = local.file_match.host_fail2ban.targets
+  forward_to = [loki.write.local.receiver]
+}
+
+// 3. Nginx Proxy Manager (accès + erreurs)
+local.file_match "npm_access" {
+  path_targets = [{
+    __path__ = "/var/log/npm/*_access.log",
+    job      = "npm",
+    log_type = "access",
+    host     = "serveur-linux",
+  }]
+}
+
+loki.process "npm_access" {
+  forward_to = [loki.write.local.receiver]
+
+  stage.regex {
+    expression = "^\\[[^\\]]+\\] - (?P<upstream_status>\\d{3}|-) (?P<status>\\d{3}|-) - (?P<method>[A-Z]+) (?P<scheme>https?) (?P<vhost>[^ ]+) \"(?P<path>[^\"]*)\" \\[Client (?P<client_ip>[^\\]]+)\\]"
+  }
+
+  stage.labels {
+    values = {
+      status = "",
+      method = "",
+      vhost  = "",
+    }
+  }
+}
+
+loki.source.file "npm_access" {
+  targets    = local.file_match.npm_access.targets
+  forward_to = [loki.process.npm_access.receiver]
+}
+
+local.file_match "npm_error" {
+  path_targets = [{
+    __path__ = "/var/log/npm/*_error.log",
+    job      = "npm",
+    log_type = "error",
+    host     = "serveur-linux",
+  }]
+}
+
+loki.source.file "npm_error" {
+  targets    = local.file_match.npm_error.targets
+  forward_to = [loki.write.local.receiver]
+}
+
+// 4. Récepteur Syslog pour pare-feu / VPN OPNsense (10.0.0.1 -> 10.0.0.74:1514)
+loki.source.syslog "opnsense" {
+  listener {
+    address               = "0.0.0.0:1514"
+    protocol              = "udp"
+    label_structured_data = false
+    labels = {
+      job  = "opnsense",
+      host = "opnsense-fw",
+    }
+  }
+
+  listener {
+    address               = "0.0.0.0:1514"
+    protocol              = "tcp"
+    label_structured_data = false
+    labels = {
+      job  = "opnsense",
+      host = "opnsense-fw",
+    }
+  }
+
+  forward_to = [loki.write.local.receiver]
+}

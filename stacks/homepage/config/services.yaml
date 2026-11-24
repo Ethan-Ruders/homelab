@@ -78,6 +78,17 @@
         widget:
           type: prometheus
           url: http://prometheus:9090
+    - Loki (Logs & Sécurité):
+        icon: loki.svg
+        href: https://grafana.homelab/d/homelab-logs-security
+        description: Centralisation logs, SSH/Fail2ban, NPM & OPNsense
+        server: my-docker
+        container: loki
+    - Grafana Alloy:
+        icon: grafana.svg
+        description: Collecteur logs Docker, système, NPM & Syslog
+        server: my-docker
+        container: alloy
     - cAdvisor:
         icon: cadvisor.svg
         description: Métriques conteneurs Docker

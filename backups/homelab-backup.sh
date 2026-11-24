@@ -17,6 +17,7 @@ mkdir -p \
     "$STAGE/npm" \
     "$STAGE/configs" \
     "$STAGE/configs/systemd" \
+    "$STAGE/configs/fail2ban" \
     "$STAGE/carnet-force" \
     "$STAGE/monitoring" \
     "$STAGE/gitea" \
@@ -91,8 +92,8 @@ if [ -f "/home/ethan/n8n-docker/docker-compose.yml" ]; then
     cp -a "/home/ethan/n8n-docker/docker-compose.yml" "$STAGE/n8n/docker-compose.yml"
 fi
 
-for f in docker-compose.yml prometheus.yml; do
-    if [ -f "/home/ethan/monitoring/$f" ]; then
+for f in docker-compose.yml prometheus.yml loki-config.yml config.alloy grafana; do
+    if [ -e "/home/ethan/monitoring/$f" ]; then
         cp -a "/home/ethan/monitoring/$f" "$STAGE/monitoring/$f"
     fi
 done
@@ -129,9 +130,15 @@ fi
 if [ -f "/etc/apt/apt.conf.d/51homelab-unattended" ]; then
     cp -a "/etc/apt/apt.conf.d/51homelab-unattended" "$STAGE/configs/51homelab-unattended"
 fi
-for unit in homelab-backup.service homelab-backup.timer homelab-backup-alert.service homelab-cert-check.service homelab-cert-check.timer; do
+for unit in homelab-backup.service homelab-backup.timer homelab-backup-alert.service homelab-cert-check.service homelab-cert-check.timer homelab-security-watch.service homelab-security-watch.timer; do
     if [ -f "/etc/systemd/system/$unit" ]; then
         cp -a "/etc/systemd/system/$unit" "$STAGE/configs/systemd/$unit"
+    fi
+done
+
+for f2b_file in /etc/fail2ban/jail.d/homelab-ssh.local /etc/fail2ban/action.d/homelab-discord.conf; do
+    if [ -f "$f2b_file" ]; then
+        cp -a "$f2b_file" "$STAGE/configs/fail2ban/$(basename "$f2b_file")"
     fi
 done
 
