@@ -13,6 +13,12 @@
         icon: opnsense.svg
         href: https://opnsense.homelab
         description: Pare-feu & VPN WireGuard
+    - Authelia SSO:
+        icon: authelia.svg
+        href: https://auth.homelab.lan
+        description: Portail SSO & gestion des sessions (*.homelab.lan)
+        server: my-docker
+        container: authelia
     - Nginx Proxy Manager:
         icon: nginx-proxy-manager.svg
         href: https://npm.homelab
@@ -34,7 +40,7 @@
 - Applications & Données:
     - Career Radar:
         icon: mdi-briefcase-search
-        href: https://carriere.homelab
+        href: https://carriere.homelab.lan
         description: Veille & suivi stages/alternances Cyber, IA, SysRes + Excel
         server: my-docker
         container: homelab-carriere
@@ -65,13 +71,13 @@
 - Monitoring & Outils:
     - Grafana:
         icon: grafana.svg
-        href: https://grafana.homelab
+        href: https://grafana.homelab.lan
         description: Tableaux de bord & métriques
         server: my-docker
         container: grafana
     - Prometheus:
         icon: prometheus.svg
-        href: https://prometheus.homelab
+        href: https://prometheus.homelab.lan
         description: Collecte métriques système
         server: my-docker
         container: prometheus
@@ -80,7 +86,7 @@
           url: http://prometheus:9090
     - Loki (Logs & Sécurité):
         icon: loki.svg
-        href: https://grafana.homelab/d/homelab-logs-security
+        href: https://grafana.homelab.lan/d/homelab-logs-security
         description: Centralisation logs, SSH/Fail2ban, NPM & OPNsense
         server: my-docker
         container: loki

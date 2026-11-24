@@ -15,11 +15,13 @@ mkdir -p \
     "$STAGE/n8n" \
     "$STAGE/grafana" \
     "$STAGE/npm" \
+    "$STAGE/npm/custom" \
     "$STAGE/configs" \
     "$STAGE/configs/systemd" \
     "$STAGE/configs/fail2ban" \
     "$STAGE/carnet-force" \
     "$STAGE/monitoring" \
+    "$STAGE/authelia" \
     "$STAGE/gitea" \
     "$STAGE/homepage" \
     "$STAGE/adguard" \
@@ -78,6 +80,9 @@ fi
 if [ -d "/home/ethan/npm/data/custom_ssl" ]; then
     cp -a "/home/ethan/npm/data/custom_ssl" "$STAGE/npm/custom_ssl"
 fi
+if [ -d "/home/ethan/npm/data/nginx/custom" ]; then
+    cp -a "/home/ethan/npm/data/nginx/custom" "$STAGE/npm/custom"
+fi
 if [ -f "/home/ethan/docker-compose.yml" ]; then
     cp -a "/home/ethan/docker-compose.yml" "$STAGE/configs/root-docker-compose.yml"
 fi
@@ -92,11 +97,21 @@ if [ -f "/home/ethan/n8n-docker/docker-compose.yml" ]; then
     cp -a "/home/ethan/n8n-docker/docker-compose.yml" "$STAGE/n8n/docker-compose.yml"
 fi
 
-for f in docker-compose.yml prometheus.yml loki-config.yml config.alloy grafana; do
+for f in docker-compose.yml .env prometheus.yml loki-config.yml config.alloy grafana; do
     if [ -e "/home/ethan/monitoring/$f" ]; then
         cp -a "/home/ethan/monitoring/$f" "$STAGE/monitoring/$f"
     fi
 done
+
+for f in docker-compose.yml configuration.yml users_database.yml secrets; do
+    if [ -e "/home/ethan/authelia-docker/$f" ]; then
+        cp -a "/home/ethan/authelia-docker/$f" "$STAGE/authelia/$f"
+    fi
+done
+if [ -f "/home/ethan/authelia-docker/data/db.sqlite3" ]; then
+    mkdir -p "$STAGE/authelia/data"
+    backup_sqlite "/home/ethan/authelia-docker/data/db.sqlite3" "$STAGE/authelia/data/db.sqlite3"
+fi
 
 if [ -f "/home/ethan/gitea-docker/docker-compose.yml" ]; then
     cp -a "/home/ethan/gitea-docker/docker-compose.yml" "$STAGE/gitea/docker-compose.yml"

@@ -6,7 +6,7 @@ services:
     env_file:
       - .env
     environment:
-      - HOMEPAGE_ALLOWED_HOSTS=homelab,homepage:3000
+      - HOMEPAGE_ALLOWED_HOSTS=homelab,home.homelab.lan,homepage:3000
       - TZ=Europe/Paris
     volumes:
       - ./config:/app/config

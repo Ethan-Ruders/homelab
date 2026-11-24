@@ -1,0 +1,10 @@
+---
+users:
+  ethan:
+    disabled: false
+    displayname: "Ethan"
+    password: "$argon2id$v=19$m=65536,t=3,p=4$REPLACE_WITH_AUTHELIA_CRYPTO_HASH"
+    email: "ethan@homelab.lan"
+    groups:
+      - admins
+      - dev

@@ -2,6 +2,8 @@
 .env
 .env.*
 !.env.example
+secrets/
+users_database.yml
 
 # Certificats, cles privees et PKI sensible
 *.key

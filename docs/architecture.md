@@ -16,12 +16,17 @@
 - **Isolation PostgreSQL :** Le conteneur `postgres-force` n'expose pas le port `5432` sur l'hôte Linux. Seuls les conteneurs membres de `homelab-net` (`n8n`, `metabase`, etc.) peuvent s'y connecter en interne.
 - **Interfaces d'administration restreintes :** L'interface Web de Nginx Proxy Manager (`:81`) et celle de Prometheus (`:9090`) ne sont bindées que sur `127.0.0.1` côté hôte et sont accessibles via reverse proxy HTTPS ou tunnel SSH.
 
-### Résolution DNS et PKI privée (`*.homelab`)
-1. **DNS (`adguard-home`) :** Résout les noms de domaine internes `*.homelab` sur le réseau local et à travers le tunnel WireGuard.
+### Résolution DNS, SSO et PKI privée (`*.homelab` & `*.homelab.lan`)
+1. **DNS (`adguard-home`) :** Résout les zones internes `*.homelab` et `*.homelab.lan` sur le réseau local et à travers le tunnel WireGuard.
 2. **Autorité de certification interne (`pki/ca.cnf`) :** Définit l'autorité racine `Ethan Homelab Root CA` (`C = FR`, `O = Homelab`). La clé privée de la CA reste strictement hors Git sur le serveur.
 3. **Certificat serveur multi-domaines (`pki/leaf.cnf`) :** Couvre les SAN suivants :
-   `n8n.homelab`, `gitea.homelab`, `grafana.homelab`, `npm.homelab`, `adguard.homelab`, `metabase.homelab`, `prometheus.homelab`, `opnsense.homelab`, `proxmox.homelab`, `homelab`, `anisette.homelab`.
+   `n8n.homelab`, `gitea.homelab`, `grafana.homelab`, `npm.homelab`, `adguard.homelab`, `metabase.homelab`, `prometheus.homelab`, `opnsense.homelab`, `proxmox.homelab`, `homelab`, `anisette.homelab`, `carriere.homelab`, `*.homelab.lan`, `homelab.lan`.
 4. **Terminaison TLS (`nginx-proxy-manager`) :** Présente le certificat wildcard/SAN signé par la Root CA et transfère les requêtes en HTTP interne sur `homelab-net`. Les postes et l'iPhone ne doivent faire confiance qu'au certificat public racine (`homelab-root-ca.crt`).
+5. **Portail SSO & OIDC (`authelia` sur `*.homelab.lan`) :**
+   - Hébergé par [`stacks/authelia/`](../stacks/authelia/docker-compose.yml) derrière `https://auth.homelab.lan` (cookie de session scopé sur `homelab.lan` pour respecter la *Public Suffix List*, politique `one_factor` activable en `two_factor` TOTP/WebAuthn).
+   - **ForwardAuth (`auth_request`)** via [`authelia-location.conf`](../stacks/core/npm-custom/authelia-location.conf) et [`authelia-authrequest.conf`](../stacks/core/npm-custom/authelia-authrequest.conf) devant `home.homelab.lan`, `carriere.homelab.lan` et `prometheus.homelab.lan`. Les anciens hôtes (`homelab`, `carriere.homelab`, `prometheus.homelab`, `grafana.homelab`) redirigent en HTTP `302` vers `*.homelab.lan`.
+   - **OIDC natif (PKCE S256)** entre `grafana` (`https://grafana.homelab.lan`) et Authelia, avec validation TLS de la Root CA interne (`/etc/grafana/certs/homelab-root-ca.crt`).
+   - Les webhooks `n8n.homelab` restent inchangés et protégés par `X-API-Key` pour l'application iOS **PowerTrack** et les alertes Discord.
 
 ---
 
@@ -71,14 +76,14 @@ La stack [`stacks/monitoring/docker-compose.yml`](../stacks/monitoring/docker-co
   - les journaux hôtes (`/var/log/auth.log`, `/var/log/syslog`, `/var/log/fail2ban.log`) ;
   - les logs Nginx Proxy Manager (`/home/ethan/npm/data/logs/*_{access,error}.log`, extraction des labels `status`, `method`, `vhost`) ;
   - un récepteur Syslog OPNsense sur `10.0.0.74:1514` (UDP/TCP, limité dans UFW à la passerelle `10.0.0.1`).
-- **`grafana`** : exposé derrière `https://grafana.homelab` avec persistance dans `grafana_data`, datasource `Loki` provisionnée automatiquement ([`loki.yml`](../stacks/monitoring/grafana/provisioning/datasources/loki.yml)), deux dashboards métriques ([Système Node Exporter](../stacks/monitoring/dashboards/node-exporter.json) et [Conteneurs cAdvisor](../stacks/monitoring/dashboards/docker-cadvisor.json)) et le dashboard sécurité provisionné [`Homelab — Logs & Sécurité (Loki)`](../stacks/monitoring/grafana/dashboards/logs-security.json) (`uid: homelab-logs-security`).
+- **`grafana`** : exposé derrière `https://grafana.homelab.lan` (redirection `302` depuis `grafana.homelab`) avec persistance dans `grafana_data`, authentification OIDC PKCE via **Authelia**, datasource `Loki` provisionnée automatiquement ([`loki.yml`](../stacks/monitoring/grafana/provisioning/datasources/loki.yml)), deux dashboards métriques ([Système Node Exporter](../stacks/monitoring/dashboards/node-exporter.json) et [Conteneurs cAdvisor](../stacks/monitoring/dashboards/docker-cadvisor.json)) et le dashboard sécurité provisionné [`Homelab — Logs & Sécurité (Loki)`](../stacks/monitoring/grafana/dashboards/logs-security.json) (`uid: homelab-logs-security`).
 
 ---
 
-## 5. Portail d'accueil (`https://homelab`)
+## 5. Portail d'accueil (`https://home.homelab.lan`)
 
 La stack [`stacks/homepage/docker-compose.yml`](../stacks/homepage/docker-compose.yml) exécute **Homepage** sur `homelab-net` :
-- **Exposition HTTPS :** résolu localement via une réécriture AdGuard dédiée (`homelab`) et routé par Nginx Proxy Manager avec le certificat SAN (`npm-1`).
+- **Exposition HTTPS & SSO :** résolu via la réécriture AdGuard `*.homelab.lan` (`home.homelab.lan`), routé par Nginx Proxy Manager avec le certificat SAN (`npm-1`) et protégé par ForwardAuth **Authelia**.
 - **Widgets & supervision :** affiche les ressources système de `Serveur-Linux` (CPU, RAM, disque `/`, uptime), interroge `/var/run/docker.sock` en lecture seule (`:ro`) pour chaque conteneur, et intègre les widgets temps réel **Proxmox VE** (token lecture seule `PVEAuditor` via `.env`), **AdGuard Home** et **Prometheus**.
 
 ---
@@ -94,4 +99,4 @@ La stack [`stacks/homepage/docker-compose.yml`](../stacks/homepage/docker-compos
   - [`homelab-alerts.json`](../stacks/n8n/workflows/homelab-alerts.json) : contrôle toutes les 10 minutes les services sur `homelab-net` + PostgreSQL, et n'alerte Discord qu'en cas de changement d'état (anti-spam).
   - [`homelab-backup-alert.json`](../stacks/n8n/workflows/homelab-backup-alert.json) : webhook sécurisé (`X-API-Key`) utilisé par [`homelab-health-alert.sh`](../backups/homelab-health-alert.sh) lors des alertes `OnFailure` de backup, du contrôle quotidien `08:00` (fraîcheur backup < 26 h, certificat `wildcard.homelab.crt` > 30 j, disque < 85 %), des bans Fail2ban (`--fail2ban-ban`) et du scan de logs sécurité Loki toutes les 5 minutes via [`homelab-security-watch.timer`](../backups/systemd/homelab-security-watch.timer) (`ssh_auth_failures`, `npm_5xx`, `npm_4xx_burst`, `docker_fatal`, cooldown 30 min).
   - [`homelab-veille-ia-cyber.json`](../stacks/n8n/workflows/homelab-veille-ia-cyber.json) : veille hebdomadaire publiée chaque dimanche à `10:00` (`Europe/Paris`) sur Discord sous la forme d'un **unique message vocal natif (`flags: 8192`) de 2 à 3 minutes** (sans texte ni URL en dessous), couvrant **IA**, **Cybersécurité (CERT-FR / Krebs / etc.)** et **Ingénierie informatique / Tech (InfoQ, Ars Technica, etc.)**. Le script podcast est rédigé en français par `gemini-3.5-flash`, synthétisé en audio par `gemini-2.5-flash-preview-tts` (voix `Aoede`), puis converti en `OGG Opus` (`48 kHz` mono + forme d'onde) et téléversé vers Discord par le sidecar interne [`stacks/tts/`](../stacks/tts/docker-compose.yml) (`homelab-tts` sur `homelab-net`).
-  - [`homelab-carriere-radar.json`](../stacks/n8n/workflows/homelab-carriere-radar.json) & [`stacks/carriere/`](../stacks/carriere/docker-compose.yml) : à `09:00` et `18:00` (`Europe/Paris`), collecte les offres de stages et d'alternances (La Bonne Alternance, portails Thales/Sopra Steria/Nokia/Arkéa, Adzuna optionnel) sur les isochrones voiture IGN `≤ 20–30 min` de Loperhet/Brest, Lannion et Caen, score la pertinence par **Google Gemini**, notifie le salon Discord dédié avec liens directs, et expose le suivi + export `.xlsx` sur `https://carriere.homelab` (base PostgreSQL `carriere`).
+  - [`homelab-carriere-radar.json`](../stacks/n8n/workflows/homelab-carriere-radar.json) & [`stacks/carriere/`](../stacks/carriere/docker-compose.yml) : à `09:00` et `18:00` (`Europe/Paris`), collecte les offres de stages et d'alternances (La Bonne Alternance, portails Thales/Sopra Steria/Nokia/Arkéa, Adzuna optionnel) sur les isochrones voiture IGN `≤ 20–30 min` de Loperhet/Brest, Lannion et Caen, score la pertinence par **Google Gemini**, notifie le salon Discord dédié avec liens directs, et expose le suivi + export `.xlsx` sur `https://carriere.homelab.lan` (base PostgreSQL `carriere`).

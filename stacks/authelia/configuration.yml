@@ -1,0 +1,90 @@
+---
+theme: 'dark'
+
+server:
+  address: 'tcp://0.0.0.0:9091'
+  endpoints:
+    authz:
+      auth-request:
+        implementation: 'AuthRequest'
+
+log:
+  level: 'info'
+  format: 'text'
+
+totp:
+  issuer: 'Homelab'
+
+webauthn:
+  display_name: 'Homelab SSO'
+
+authentication_backend:
+  file:
+    path: '/config/users_database.yml'
+    password:
+      algorithm: 'argon2'
+      argon2:
+        variant: 'argon2id'
+        iterations: 3
+        memory: 65536
+        parallelism: 4
+        key_length: 32
+        salt_length: 16
+
+access_control:
+  default_policy: 'deny'
+  rules:
+    - domain: '*.homelab.lan'
+      policy: 'one_factor'
+
+session:
+  name: 'authelia_session'
+  inactivity: '2h'
+  expiration: '24h'
+  remember_me: '30d'
+  cookies:
+    - domain: 'homelab.lan'
+      authelia_url: 'https://auth.homelab.lan'
+      default_redirection_url: 'https://home.homelab.lan'
+
+regulation:
+  max_retries: 5
+  find_time: '10m'
+  ban_time: '30m'
+
+storage:
+  local:
+    path: '/data/db.sqlite3'
+
+notifier:
+  filesystem:
+    filename: '/data/notification.txt'
+
+identity_providers:
+  oidc:
+    jwks:
+      - key_id: 'homelab-rsa-1'
+        algorithm: 'RS256'
+        use: 'sig'
+        key: {{ secret "/secrets/oidc_jwks_key.pem" | mindent 10 "|" | msquote }}
+    clients:
+      - client_id: 'grafana'
+        client_name: 'Grafana Homelab'
+        client_secret: '{{ secret "/secrets/grafana_client_secret_hash" }}'
+        public: false
+        authorization_policy: 'one_factor'
+        require_pkce: true
+        pkce_challenge_method: 'S256'
+        redirect_uris:
+          - 'https://grafana.homelab.lan/login/generic_oauth'
+        scopes:
+          - 'openid'
+          - 'profile'
+          - 'groups'
+          - 'email'
+        response_types:
+          - 'code'
+        grant_types:
+          - 'authorization_code'
+        token_endpoint_auth_method: 'client_secret_basic'
+        consent_mode: 'implicit'

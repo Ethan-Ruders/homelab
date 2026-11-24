@@ -10,12 +10,13 @@ Dépôt Infrastructure-as-Code et documentation du homelab personnel hébergé s
 
 ```mermaid
 flowchart LR
-    Client["App PowerTrack (iOS) / Poste Mac"] -->|"HTTPS *.homelab (LAN ou WireGuard)"| OPN["VM 100 : OPNsense-FW"]
+    Client["App PowerTrack (iOS) / Poste Mac"] -->|"HTTPS *.homelab / *.homelab.lan (LAN ou WireGuard)"| OPN["VM 100 : OPNsense-FW"]
     OPN --> AdGuard["AdGuard Home (DNS :53)"]
     OPN --> NPM["Nginx Proxy Manager (:80 / :443, TLS interne)"]
+    NPM -->|"ForwardAuth (:9091)"| Authelia["Authelia SSO (:9091)"]
     NPM -->|"homelab-net"| Homepage["Homepage (:3000)"]
     NPM -->|"homelab-net"| N8N["n8n (:5678)"]
-    NPM -->|"homelab-net"| Grafana["Grafana (:3000)"]
+    NPM -->|"homelab-net + OIDC"| Grafana["Grafana (:3000)"]
     NPM -->|"homelab-net"| Gitea["Gitea (:3000, SSH :222)"]
     N8N -->|"SQL + Upsert seance_id"| PG["postgres-force (PostgreSQL 15)"]
     N8N -->|"Alertes & Veille"| Discord["Discord (#général)"]
@@ -28,20 +29,21 @@ flowchart LR
 
 ---
 
-## Services et domaines internes (`*.homelab`)
+## Services et domaines internes (`*.homelab` & `*.homelab.lan`)
 
 | Service | Conteneur / Hôte | Domaine SAN | Rôle | Statut |
 | :--- | :--- | :--- | :--- | :--- |
-| Portail d'accueil | `homepage` | `homelab` | Page d'accueil centralisée & widgets en direct (Proxmox, AdGuard, Prometheus, Docker) | Actif |
-| Reverse Proxy | `nginx-proxy-manager` | `npm.homelab` | Terminaison TLS & routage HTTPS (`127.0.0.1:81` pour l'admin) | Actif |
-| DNS local | `adguard-home` | `adguard.homelab` | Résolution `*.homelab` et filtrage DNS (`:53`) | Actif |
+| Portail SSO / OIDC | `authelia` | `auth.homelab.lan` | Authentification centralisée (`ForwardAuth` NPM + fournisseur OIDC PKCE) | Actif |
+| Portail d'accueil | `homepage` | `home.homelab.lan` *(redirection depuis `homelab`)* | Page d'accueil centralisée & widgets en direct (protégé par Authelia) | Actif |
+| Reverse Proxy | `nginx-proxy-manager` | `npm.homelab` | Terminaison TLS, `auth_request` Authelia & routage HTTPS (`127.0.0.1:81`) | Actif |
+| DNS local | `adguard-home` | `adguard.homelab` | Résolution `*.homelab` / `*.homelab.lan` et filtrage DNS (`:53`) | Actif |
 | Automatisation | `n8n` | `n8n.homelab` | Webhooks PowerTrack (`POST`/`GET`), surveillance services, alertes backup, veille vocale & radar stages/alternance | Actif |
-| Radar Carrière | `homelab-carriere` | `carriere.homelab` | Interface web de suivi candidatures (offres, entreprises ≤ 30 min IGN) & export Excel (`.xlsx`) | Actif |
+| Radar Carrière | `homelab-carriere` | `carriere.homelab.lan` *(redirection depuis `carriere.homelab`)* | Suivi candidatures (offres, entreprises ≤ 30 min IGN) & export Excel (`.xlsx`, protégé par Authelia) | Actif |
 | Synthèse vocale | `homelab-tts` | *(réseau interne `homelab-net`)* | Sidecar Python/FFmpeg de conversion PCM → OGG Opus & upload vocal Discord pour `n8n` (contient aussi Piper local optionnel) | Actif |
 | Base de données | `postgres-force` | *(réseau interne `homelab-net`)* | PostgreSQL 15 (`powertrack`, `carriere`, `db_entrainement`), non exposé hors Docker | Actif |
-| Visualisation | `grafana` | `grafana.homelab` | Dashboards système Linux (`Node Exporter`), conteneurs (`cAdvisor`) & logs/sécurité (`Loki`) | Actif |
+| Visualisation | `grafana` | `grafana.homelab.lan` *(redirection depuis `grafana.homelab`)* | Dashboards système (`Node Exporter`), conteneurs (`cAdvisor`), logs/sécurité (`Loki`) + SSO OIDC Authelia | Actif |
 | Centralisation logs | `loki` / `alloy` | *(réseau interne `homelab-net`)* | Collecte et indexation des logs (Docker, SSH/auth, Fail2ban, NPM, Syslog OPNsense `:1514`), rétention 14 j | Actif |
-| Métriques | `prometheus` / `node-exporter` / `cadvisor` | `prometheus.homelab` | Collecte métriques hôte et conteneurs Docker | Actif |
+| Métriques | `prometheus` / `node-exporter` / `cadvisor` | `prometheus.homelab.lan` *(redirection depuis `prometheus.homelab`)* | Collecte métriques hôte et conteneurs Docker (protégé par Authelia) | Actif |
 | Forge Git | `gitea` | `gitea.homelab` | Dépôts Git locaux (SSH sur port `222`) | Actif |
 | BI / Exploration | `metabase` | `metabase.homelab` | Exploration SQL (`restart: "no"`, démarré à la demande) | À la demande |
 | Pare-feu / VPN | VM 100 (`OPNsense-FW`) | `opnsense.homelab` | Routage, pare-feu et tunnel WireGuard | Actif |
@@ -55,6 +57,8 @@ flowchart LR
 | Chemin dans ce dépôt | Emplacement réel sur l'infrastructure | Description |
 | :--- | :--- | :--- |
 | [`stacks/core/docker-compose.yml`](stacks/core/docker-compose.yml) | `/home/ethan/docker-compose.yml` | Réseau `homelab-net`, Nginx Proxy Manager et AdGuard Home |
+| [`stacks/core/npm-custom/`](stacks/core/npm-custom/authelia-location.conf) | `/home/ethan/npm/data/nginx/custom/` | Snippets Nginx `auth_request` partagés (`authelia-location.conf`, `authelia-authrequest.conf`) |
+| [`stacks/authelia/`](stacks/authelia/docker-compose.yml) | `/home/ethan/authelia-docker/` | Portail SSO **Authelia** (`auth.homelab.lan`), fournisseur OIDC PKCE (secrets/users hors Git) |
 | [`stacks/carnet-force/docker-compose.yml`](stacks/carnet-force/docker-compose.yml) | `/home/ethan/carnet-force/docker-compose.yml` | Stack PostgreSQL 15 (`postgres-force`) et Metabase |
 | [`stacks/carnet-force/.env.example`](stacks/carnet-force/.env.example) | `/home/ethan/carnet-force/.env` *(non suivi)* | Modèle de variables d'environnement PostgreSQL |
 | [`stacks/carnet-force/init-powertrack.sql`](stacks/carnet-force/init-powertrack.sql) | `/home/ethan/carnet-force/init-powertrack.sql` | Schéma SQL, fonctions d'upsert, alertes et vues PowerTrack |

@@ -3,4 +3,4 @@ subjectKeyIdentifier = hash
 authorityKeyIdentifier = keyid,issuer
 keyUsage = critical, digitalSignature, keyEncipherment
 extendedKeyUsage = serverAuth
-subjectAltName = DNS:n8n.homelab,DNS:gitea.homelab,DNS:grafana.homelab,DNS:npm.homelab,DNS:adguard.homelab,DNS:metabase.homelab,DNS:prometheus.homelab,DNS:opnsense.homelab,DNS:proxmox.homelab,DNS:homelab,DNS:anisette.homelab,DNS:carriere.homelab
+subjectAltName = DNS:n8n.homelab,DNS:gitea.homelab,DNS:grafana.homelab,DNS:npm.homelab,DNS:adguard.homelab,DNS:metabase.homelab,DNS:prometheus.homelab,DNS:opnsense.homelab,DNS:proxmox.homelab,DNS:homelab,DNS:anisette.homelab,DNS:carriere.homelab,DNS:*.homelab.lan,DNS:homelab.lan
