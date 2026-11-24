@@ -1,0 +1,113 @@
+name: DevSecOps CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 7 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  secret-scan:
+    name: Secret Scan (Gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository with full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan git history and configs with Gitleaks
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/repo:ro" \
+            -w /repo \
+            ghcr.io/gitleaks/gitleaks:latest \
+            git /repo --config /repo/.gitleaks.toml --verbose --redact
+
+  shell-and-config-lint:
+    name: ShellCheck & Compose/Config Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run bash syntax check and ShellCheck
+        run: |
+          bash -n backups/*.sh
+          shellcheck -S warning backups/*.sh
+
+      - name: Validate JSON and YAML syntax
+        run: |
+          python3 -m pip install --quiet pyyaml
+          python3 - <<'PY'
+          import glob, json, sys, yaml
+
+          errors = 0
+          for path in sorted(glob.glob('**/*.json', recursive=True)):
+              try:
+                  with open(path, 'r', encoding='utf-8') as f:
+                      json.load(f)
+              except Exception as exc:
+                  print(f'JSON ERROR {path}: {exc}', file=sys.stderr)
+                  errors += 1
+
+          skip_yaml = {'stacks/authelia/configuration.yml'}
+          for ext in ('**/*.yml', '**/*.yaml'):
+              for path in sorted(glob.glob(ext, recursive=True)):
+                  if path in skip_yaml:
+                      continue
+                  try:
+                      with open(path, 'r', encoding='utf-8') as f:
+                          yaml.safe_load(f)
+                  except Exception as exc:
+                      print(f'YAML ERROR {path}: {exc}', file=sys.stderr)
+                      errors += 1
+
+          if errors:
+              sys.exit(1)
+          print('JSON/YAML syntax validation passed.')
+          PY
+
+      - name: Validate all Docker Compose stacks
+        run: |
+          for compose in stacks/*/docker-compose.yml; do
+            dir="$(dirname "$compose")"
+            if [ ! -f "$dir/.env" ]; then
+              if [ -f "$dir/.env.example" ]; then
+                cp "$dir/.env.example" "$dir/.env"
+              else
+                : > "$dir/.env"
+              fi
+            fi
+            echo "Checking $compose"
+            docker compose -f "$compose" config -q
+          done
+
+  trivy-security-scan:
+    name: IaC & Vulnerability Scan (Trivy)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Trivy IaC misconfiguration scan
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/repo:ro" \
+            -w /repo \
+            ghcr.io/aquasecurity/trivy:latest \
+            config --ignorefile /repo/.trivyignore --severity HIGH,CRITICAL --exit-code 1 /repo
+
+      - name: Run Trivy filesystem vulnerability and secret scan
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/repo:ro" \
+            -w /repo \
+            ghcr.io/aquasecurity/trivy:latest \
+            fs --ignorefile /repo/.trivyignore --scanners vuln,secret --severity CRITICAL --exit-code 1 /repo

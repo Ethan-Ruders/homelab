@@ -1,0 +1,4 @@
+title = "Homelab Gitleaks Policy"
+
+[extend]
+useDefault = true

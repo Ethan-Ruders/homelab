@@ -199,7 +199,8 @@ for item in json.loads(sys.argv[1]):
     print(base64.b64encode(json.dumps(item).encode()).decode())' "$alerts_json")
 
     if [ "${#sent_ids[@]}" -gt 0 ]; then
-        mkdir -p -m 755 /var/lib/homelab-security-watch
+        mkdir -p /var/lib/homelab-security-watch
+        chmod 755 /var/lib/homelab-security-watch
         python3 - "${sent_ids[@]}" <<'PY'
 import json, os, sys, time
 path = "/var/lib/homelab-security-watch/state.json"

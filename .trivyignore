@@ -1,0 +1,3 @@
+# Exceptions Trivy vérifiées et documentées pour le homelab
+# Conteneurs internes Python isolés sur homelab-net sans ports exposés à l'hôte (migration non-root différée pour préserver les builds locaux actuels).
+DS-0002

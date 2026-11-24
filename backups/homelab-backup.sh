@@ -7,7 +7,8 @@ BACKUP_DIR="/home/ethan/backups/homelab"
 STAGE="$(mktemp -d /tmp/homelab-backup.XXXXXX)"
 trap 'rm -rf "$STAGE"' EXIT
 
-mkdir -p -m 700 "$BACKUP_DIR"
+mkdir -p "$BACKUP_DIR"
+chmod 700 "$BACKUP_DIR"
 chown ethan:ethan "$BACKUP_DIR"
 
 mkdir -p \
@@ -19,6 +20,7 @@ mkdir -p \
     "$STAGE/configs" \
     "$STAGE/configs/systemd" \
     "$STAGE/configs/fail2ban" \
+    "$STAGE/configs/hardening" \
     "$STAGE/carnet-force" \
     "$STAGE/monitoring" \
     "$STAGE/authelia" \
@@ -154,6 +156,16 @@ done
 for f2b_file in /etc/fail2ban/jail.d/homelab-ssh.local /etc/fail2ban/action.d/homelab-discord.conf; do
     if [ -f "$f2b_file" ]; then
         cp -a "$f2b_file" "$STAGE/configs/fail2ban/$(basename "$f2b_file")"
+    fi
+done
+
+for harden_file in \
+    /etc/ssh/sshd_config.d/10-homelab-hardening.conf \
+    /etc/sysctl.d/98-homelab-hardening.conf \
+    /etc/modprobe.d/99-homelab-blacklist.conf \
+    /etc/security/limits.d/99-homelab-nocoredump.conf; do
+    if [ -f "$harden_file" ]; then
+        cp -a "$harden_file" "$STAGE/configs/hardening/$(basename "$harden_file")"
     fi
 done
 

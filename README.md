@@ -1,5 +1,7 @@
 # Homelab Infrastructure & PowerTrack Pipeline
 
+[![DevSecOps CI](https://github.com/Ethan-Ruders/homelab/actions/workflows/devsecops.yml/badge.svg)](https://github.com/Ethan-Ruders/homelab/actions/workflows/devsecops.yml)
+
 Dépôt Infrastructure-as-Code et documentation du homelab personnel hébergé sous **Proxmox VE**, combinant pare-feu/VPN (**OPNsense + WireGuard**), services Docker auto-hébergés sur **`Serveur-Linux` (VM 101)** et le pipeline d'analyse d'entraînement de l'application iOS **PowerTrack** (`n8n` → `PostgreSQL 15` → `Grafana` / `MCP`).
 
 > **Note de sécurité :** Ce dépôt ne contient aucun secret, mot de passe, clé API, certificat privé, ni export de base de données. Les fichiers sensibles (`.env`, `*.key`, `*.crt`, `*.sqlite`, `*.dump`, `*.tar.gz`) sont bloqués par `.gitignore`.
@@ -77,6 +79,8 @@ flowchart LR
 | [`backups/proxmox/jobs.cfg`](backups/proxmox/jobs.cfg) | `/etc/pve/jobs.cfg` *(hôte Proxmox)* | Tâche hebdomadaire `vzdump` des VM 100 et 101 |
 | [`system/51homelab-unattended`](system/51homelab-unattended) | `/etc/apt/apt.conf.d/51homelab-unattended` | Mises à jour de sécurité APT automatiques (sans reboot auto) |
 | [`system/fail2ban/`](system/fail2ban/homelab-ssh.local) | `/etc/fail2ban/` | Protection SSH `sshd` (`nftables`, ban 1 h après 5 échecs) & action alerte Discord |
+| [`system/hardening/`](system/hardening/10-homelab-hardening.conf) | `/etc/ssh/sshd_config.d/`, `/etc/sysctl.d/`, `/etc/modprobe.d/` | Durcissement système aligné Lynis (SSH par clé, sysctl noyau/réseau, modprobe, core dumps) |
+| [`.github/workflows/devsecops.yml`](.github/workflows/devsecops.yml) | *(GitHub Actions CI)* | Pipeline DevSecOps : Gitleaks, ShellCheck, validation JSON/YAML/Compose et scan Trivy |
 
 ---
 
@@ -84,6 +88,7 @@ flowchart LR
 
 - [Architecture réseau, PKI et pipeline PowerTrack](docs/architecture.md)
 - [Stratégie de sauvegarde et procédures de restauration](docs/backup-restore.md)
+- [Audit sécurité Lynis & pipeline DevSecOps CI](docs/security-hardening.md)
 
 ---
 
