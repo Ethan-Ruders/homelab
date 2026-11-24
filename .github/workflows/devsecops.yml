@@ -111,3 +111,24 @@ jobs:
             -w /repo \
             ghcr.io/aquasecurity/trivy:latest \
             fs --ignorefile /repo/.trivyignore --scanners vuln,secret --severity CRITICAL --exit-code 1 /repo
+
+  ansible-lint:
+    name: Ansible Syntax & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install Ansible and ansible-lint
+        run: |
+          python3 -m pip install --quiet ansible-core ansible-lint
+
+      - name: Install required Ansible collections
+        run: |
+          ansible-galaxy collection install -r ansible/requirements.yml
+
+      - name: Run Ansible syntax check and ansible-lint
+        run: |
+          cd ansible
+          ansible-playbook --syntax-check playbooks/site.yml
+          ansible-lint

@@ -1,0 +1,140 @@
+---
+- name: Deploy SSH legal warning banner
+  ansible.builtin.copy:
+    src: "{{ homelab_repo_root }}/system/hardening/issue.net"
+    dest: /etc/issue.net
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload ssh
+
+- name: Deploy hardened SSH drop-in configuration
+  ansible.builtin.copy:
+    src: "{{ homelab_repo_root }}/system/hardening/10-homelab-hardening.conf"
+    dest: /etc/ssh/sshd_config.d/10-homelab-hardening.conf
+    owner: root
+    group: root
+    mode: "0600"
+    validate: "/usr/sbin/sshd -t -f %s"
+  notify: Reload ssh
+
+- name: Enforce permissions on primary sshd_config
+  ansible.builtin.file:
+    path: /etc/ssh/sshd_config
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Ensure ssh.socket is enabled and running
+  ansible.builtin.systemd_service:
+    name: ssh.socket
+    enabled: true
+    state: started
+
+- name: Deploy kernel and network hardening sysctl configuration
+  ansible.builtin.copy:
+    src: "{{ homelab_repo_root }}/system/hardening/98-homelab-hardening.conf"
+    dest: /etc/sysctl.d/98-homelab-hardening.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload hardening sysctl
+
+- name: Deploy modprobe hardening blacklist
+  ansible.builtin.copy:
+    src: "{{ homelab_repo_root }}/system/hardening/99-homelab-blacklist.conf"
+    dest: /etc/modprobe.d/99-homelab-blacklist.conf
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Deploy core dump restriction limits configuration
+  ansible.builtin.copy:
+    src: "{{ homelab_repo_root }}/system/hardening/99-homelab-nocoredump.conf"
+    dest: /etc/security/limits.d/99-homelab-nocoredump.conf
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Enforce permissions on system crontab
+  ansible.builtin.file:
+    path: /etc/crontab
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Enforce permissions on cron directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  loop:
+    - /etc/cron.hourly
+    - /etc/cron.daily
+    - /etc/cron.weekly
+    - /etc/cron.monthly
+    - /etc/cron.d
+
+- name: Enforce restrictive UMASK 027 in login.defs
+  ansible.builtin.lineinfile:
+    path: /etc/login.defs
+    regexp: '^UMASK\s+'
+    line: "UMASK\t\t027"
+
+- name: Set UFW default incoming deny policy
+  community.general.ufw:
+    direction: incoming
+    default: deny
+
+- name: Set UFW default outgoing allow policy
+  community.general.ufw:
+    direction: outgoing
+    default: allow
+
+- name: Set UFW default routed deny policy
+  community.general.ufw:
+    direction: routed
+    default: deny
+
+- name: Configure UFW logging level
+  community.general.ufw:
+    logging: "low"
+
+- name: Ensure required UFW allow rules exist
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.port }}"
+    proto: "{{ item.proto }}"
+    from_ip: "{{ item.from_ip | default(omit) }}"
+    comment: "{{ item.comment }}"
+  loop: "{{ homelab_ufw_rules }}"
+
+- name: Ensure UFW firewall is enabled
+  community.general.ufw:
+    state: enabled
+
+- name: Deploy Fail2ban SSH jail configuration
+  ansible.builtin.copy:
+    src: "{{ homelab_repo_root }}/system/fail2ban/homelab-ssh.local"
+    dest: /etc/fail2ban/jail.d/homelab-ssh.local
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload fail2ban
+
+- name: Deploy Fail2ban Discord notification action
+  ansible.builtin.copy:
+    src: "{{ homelab_repo_root }}/system/fail2ban/homelab-discord.conf"
+    dest: /etc/fail2ban/action.d/homelab-discord.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload fail2ban
+
+- name: Ensure Fail2ban service is enabled and running
+  ansible.builtin.systemd_service:
+    name: fail2ban
+    enabled: true
+    state: started

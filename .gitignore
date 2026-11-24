@@ -39,3 +39,5 @@ n8n/config
 .DS_Store
 *.log
 *.tmp
+*.retry
+.ansible/

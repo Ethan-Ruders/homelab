@@ -78,9 +78,11 @@ flowchart LR
 | [`backups/systemd/`](backups/systemd/homelab-backup.timer) | `/etc/systemd/system/` | Services & timers (`03:30` backup, `08:00` santé, toutes les `5 min` veille sécurité Loki) |
 | [`backups/proxmox/jobs.cfg`](backups/proxmox/jobs.cfg) | `/etc/pve/jobs.cfg` *(hôte Proxmox)* | Tâche hebdomadaire `vzdump` des VM 100 et 101 |
 | [`system/51homelab-unattended`](system/51homelab-unattended) | `/etc/apt/apt.conf.d/51homelab-unattended` | Mises à jour de sécurité APT automatiques (sans reboot auto) |
+| [`system/docker-daemon.json`](system/docker-daemon.json) | `/etc/docker/daemon.json` | Rotation automatique des logs Docker (`json-file`, `10m` × `3`) |
 | [`system/fail2ban/`](system/fail2ban/homelab-ssh.local) | `/etc/fail2ban/` | Protection SSH `sshd` (`nftables`, ban 1 h après 5 échecs) & action alerte Discord |
 | [`system/hardening/`](system/hardening/10-homelab-hardening.conf) | `/etc/ssh/sshd_config.d/`, `/etc/sysctl.d/`, `/etc/modprobe.d/` | Durcissement système aligné Lynis (SSH par clé, sysctl noyau/réseau, modprobe, core dumps) |
-| [`.github/workflows/devsecops.yml`](.github/workflows/devsecops.yml) | *(GitHub Actions CI)* | Pipeline DevSecOps : Gitleaks, ShellCheck, validation JSON/YAML/Compose et scan Trivy |
+| [`ansible/`](ansible/playbooks/site.yml) | *(Exécuté depuis Mac via SSH)* | Playbook & rôles IaC (`base`, `docker`, `hardening`, `operations`, `stacks`) idempotents |
+| [`.github/workflows/devsecops.yml`](.github/workflows/devsecops.yml) | *(GitHub Actions CI)* | Pipeline DevSecOps : Gitleaks, ShellCheck, validation JSON/YAML/Compose, Trivy et `ansible-lint` |
 
 ---
 
@@ -89,13 +91,13 @@ flowchart LR
 - [Architecture réseau, PKI et pipeline PowerTrack](docs/architecture.md)
 - [Stratégie de sauvegarde et procédures de restauration](docs/backup-restore.md)
 - [Audit sécurité Lynis & pipeline DevSecOps CI](docs/security-hardening.md)
+- [Infrastructure as Code (Ansible)](docs/ansible-iac.md)
 
 ---
 
 ## Déploiement / Recréation de l'environnement
 
-1. Créer les fichiers `.env` requis à partir des modèles (ex. `cp stacks/carnet-force/.env.example .env`) avec des secrets générés localement.
-2. Démarrer d'abord la stack cœur (`stacks/core/docker-compose.yml`) pour initialiser le réseau Docker partagé `homelab-net`.
-3. Démarrer ensuite les stacks dépendantes (`carnet-force`, `n8n`, `monitoring`, `gitea`).
-4. Initialiser la base `powertrack` dans `postgres-force` à l'aide de [`init-powertrack.sql`](stacks/carnet-force/init-powertrack.sql), créer le rôle lecture seule `powertrack_ro`, puis importer les workflows `n8n` en rattachant les identifiants dans l'interface `n8n` (`PowerTrack API Key` et `Postgres PowerTrack`).
-5. Générer la PKI privée à partir de [`pki/ca.cnf`](pki/ca.cnf) et [`pki/leaf.cnf`](pki/leaf.cnf), importer la paire certificat/clé feuille dans Nginx Proxy Manager et installer uniquement le certificat racine public (`homelab-root-ca.crt`) sur les appareils clients.
+1. Provisionner automatiquement `Serveur-Linux` (paquets, Docker, durcissement SSH/UFW/Fail2ban, scripts/timers systemd et arborescence des stacks) via Ansible depuis le poste local : `cd ansible && ansible-playbook playbooks/site.yml --diff`.
+2. Restaurer ou recréer les fichiers hors Git (`.env`, `secrets/`, `users_database.yml`, PKI [`pki/`](pki/ca.cnf)) depuis le dernier backup ou les modèles `.env.example`.
+3. Démarrer toutes les stacks actives dans l'ordre via `cd ansible && ansible-playbook playbooks/site.yml -e homelab_apply_stacks=true` (ou manuellement en commençant par `stacks/core/docker-compose.yml`).
+4. En cas de reconstruction à neuf sans backup, initialiser la base `powertrack` avec [`init-powertrack.sql`](stacks/carnet-force/init-powertrack.sql), créer `powertrack_ro`, importer les workflows `n8n` et configurer Nginx Proxy Manager / la PKI ([`pki/ca.cnf`](pki/ca.cnf), [`pki/leaf.cnf`](pki/leaf.cnf)).

@@ -1,0 +1,42 @@
+---
+- name: Ensure backup directories exist with restricted permissions
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ homelab_user }}"
+    group: "{{ homelab_group }}"
+    mode: "0700"
+  loop:
+    - "{{ homelab_home }}/backups"
+    - "{{ homelab_home }}/backups/homelab"
+
+- name: Deploy homelab operational scripts
+  ansible.builtin.copy:
+    src: "{{ homelab_repo_root }}/backups/{{ item }}"
+    dest: "/usr/local/sbin/{{ item }}"
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - homelab-backup.sh
+    - homelab-health-alert.sh
+
+- name: Deploy systemd service and timer units
+  ansible.builtin.copy:
+    src: "{{ homelab_repo_root }}/backups/systemd/{{ item }}"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ homelab_systemd_units }}"
+  notify: Reload systemd daemon
+
+- name: Flush systemd daemon reload handlers
+  ansible.builtin.meta: flush_handlers
+
+- name: Ensure homelab systemd timers are enabled and running
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop: "{{ homelab_systemd_timers }}"

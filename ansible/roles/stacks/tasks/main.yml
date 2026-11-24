@@ -1,0 +1,46 @@
+---
+- name: Ensure stack directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ homelab_user }}"
+    group: "{{ homelab_group }}"
+    mode: "0755"
+  loop: "{{ homelab_stack_dirs }}"
+
+- name: Ensure Nginx Proxy Manager custom snippet directory exists
+  ansible.builtin.file:
+    path: "{{ homelab_home }}/npm/data/nginx/custom"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Sync versioned Docker Compose and service configuration files
+  ansible.builtin.copy:
+    src: "{{ homelab_repo_root }}/{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: "{{ homelab_user }}"
+    group: "{{ homelab_group }}"
+    mode: "0644"
+  loop: "{{ homelab_stack_files }}"
+
+- name: Sync Nginx Proxy Manager Authelia snippets
+  ansible.builtin.copy:
+    src: "{{ homelab_repo_root }}/{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ homelab_npm_custom_files }}"
+
+- name: Apply active Docker Compose stacks when requested
+  ansible.builtin.command:
+    cmd: docker compose up -d
+    chdir: "{{ item }}"
+  become: true
+  become_user: "{{ homelab_user }}"
+  register: stacks_compose_up
+  changed_when: "'Started' in stacks_compose_up.stderr or 'Recreated' in stacks_compose_up.stderr or 'Created' in stacks_compose_up.stderr"
+  when: homelab_apply_stacks | bool
+  loop: "{{ homelab_active_compose_dirs }}"

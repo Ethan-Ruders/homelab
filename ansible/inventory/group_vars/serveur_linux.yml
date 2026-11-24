@@ -1,0 +1,148 @@
+---
+homelab_user: ethan
+homelab_group: ethan
+homelab_home: /home/ethan
+homelab_repo_root: "{{ playbook_dir }}/../.."
+homelab_apply_stacks: false
+
+homelab_base_packages:
+  - ca-certificates
+  - curl
+  - fail2ban
+  - git
+  - gnupg
+  - jq
+  - lynis
+  - python3
+  - ufw
+  - unattended-upgrades
+
+homelab_docker_packages:
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
+  - docker-compose-plugin
+
+homelab_docker_network: homelab-net
+
+homelab_ufw_rules:
+  - port: "22"
+    proto: tcp
+    comment: "SSH"
+  - port: "53"
+    proto: tcp
+    comment: "AdGuard DNS TCP"
+  - port: "53"
+    proto: udp
+    comment: "AdGuard DNS UDP"
+  - port: "80"
+    proto: tcp
+    comment: "NPM HTTP"
+  - port: "443"
+    proto: tcp
+    comment: "NPM HTTPS"
+  - port: "222"
+    proto: tcp
+    comment: "Gitea SSH"
+  - port: "1514"
+    proto: udp
+    from_ip: "10.0.0.1"
+    comment: "OPNsense Syslog UDP"
+  - port: "1514"
+    proto: tcp
+    from_ip: "10.0.0.1"
+    comment: "OPNsense Syslog TCP"
+
+homelab_systemd_units:
+  - homelab-backup.service
+  - homelab-backup.timer
+  - homelab-backup-alert.service
+  - homelab-cert-check.service
+  - homelab-cert-check.timer
+  - homelab-security-watch.service
+  - homelab-security-watch.timer
+
+homelab_systemd_timers:
+  - homelab-backup.timer
+  - homelab-cert-check.timer
+  - homelab-security-watch.timer
+
+homelab_stack_dirs:
+  - /home/ethan/anisette-docker
+  - /home/ethan/authelia-docker
+  - /home/ethan/carnet-force
+  - /home/ethan/carriere-docker
+  - /home/ethan/gitea-docker
+  - /home/ethan/homepage-docker
+  - /home/ethan/homepage-docker/config
+  - /home/ethan/monitoring
+  - /home/ethan/monitoring/grafana
+  - /home/ethan/monitoring/grafana/dashboards
+  - /home/ethan/monitoring/grafana/provisioning
+  - /home/ethan/monitoring/grafana/provisioning/dashboards
+  - /home/ethan/monitoring/grafana/provisioning/datasources
+  - /home/ethan/n8n-docker
+  - /home/ethan/tts-docker
+
+homelab_stack_files:
+  - src: stacks/core/docker-compose.yml
+    dest: /home/ethan/docker-compose.yml
+  - src: stacks/anisette/docker-compose.yml
+    dest: /home/ethan/anisette-docker/docker-compose.yml
+  - src: stacks/authelia/docker-compose.yml
+    dest: /home/ethan/authelia-docker/docker-compose.yml
+  - src: stacks/authelia/configuration.yml
+    dest: /home/ethan/authelia-docker/configuration.yml
+  - src: stacks/carnet-force/docker-compose.yml
+    dest: /home/ethan/carnet-force/docker-compose.yml
+  - src: stacks/carriere/docker-compose.yml
+    dest: /home/ethan/carriere-docker/docker-compose.yml
+  - src: stacks/gitea/docker-compose.yml
+    dest: /home/ethan/gitea-docker/docker-compose.yml
+  - src: stacks/homepage/docker-compose.yml
+    dest: /home/ethan/homepage-docker/docker-compose.yml
+  - src: stacks/homepage/config/bookmarks.yaml
+    dest: /home/ethan/homepage-docker/config/bookmarks.yaml
+  - src: stacks/homepage/config/docker.yaml
+    dest: /home/ethan/homepage-docker/config/docker.yaml
+  - src: stacks/homepage/config/services.yaml
+    dest: /home/ethan/homepage-docker/config/services.yaml
+  - src: stacks/homepage/config/settings.yaml
+    dest: /home/ethan/homepage-docker/config/settings.yaml
+  - src: stacks/homepage/config/widgets.yaml
+    dest: /home/ethan/homepage-docker/config/widgets.yaml
+  - src: stacks/monitoring/docker-compose.yml
+    dest: /home/ethan/monitoring/docker-compose.yml
+  - src: stacks/monitoring/loki-config.yml
+    dest: /home/ethan/monitoring/loki-config.yml
+  - src: stacks/monitoring/config.alloy
+    dest: /home/ethan/monitoring/config.alloy
+  - src: stacks/monitoring/prometheus.yml
+    dest: /home/ethan/monitoring/prometheus.yml
+  - src: stacks/monitoring/grafana/provisioning/datasources/loki.yml
+    dest: /home/ethan/monitoring/grafana/provisioning/datasources/loki.yml
+  - src: stacks/monitoring/grafana/provisioning/dashboards/homelab-logs.yml
+    dest: /home/ethan/monitoring/grafana/provisioning/dashboards/homelab-logs.yml
+  - src: stacks/monitoring/grafana/dashboards/logs-security.json
+    dest: /home/ethan/monitoring/grafana/dashboards/logs-security.json
+  - src: stacks/n8n/docker-compose.yml
+    dest: /home/ethan/n8n-docker/docker-compose.yml
+  - src: stacks/tts/docker-compose.yml
+    dest: /home/ethan/tts-docker/docker-compose.yml
+
+homelab_npm_custom_files:
+  - src: stacks/core/npm-custom/authelia-location.conf
+    dest: /home/ethan/npm/data/nginx/custom/authelia-location.conf
+  - src: stacks/core/npm-custom/authelia-authrequest.conf
+    dest: /home/ethan/npm/data/nginx/custom/authelia-authrequest.conf
+
+homelab_active_compose_dirs:
+  - /home/ethan
+  - /home/ethan/authelia-docker
+  - /home/ethan/carnet-force
+  - /home/ethan/n8n-docker
+  - /home/ethan/monitoring
+  - /home/ethan/homepage-docker
+  - /home/ethan/carriere-docker
+  - /home/ethan/tts-docker
+  - /home/ethan/gitea-docker
